@@ -128,6 +128,21 @@ async def log_daily_counts():
 async def c_group(ctx):
     await ctx.send("⚠️ Use `!c setup` or `!c relog`")
 
+@c_group.command(name="help")
+async def help_command(ctx):
+    help_msg = """
+A bot that can log progress of a counting channel in your guild!
+
+**-USAGE-**
+Let it run and it will automatically update your logs every `5 minutes`
+
+**-COMMAND-**
+`!c setup` : view your current channel set up
+`!c setup <your_log_channel> <your_counting_channel>` : set each specified channel as current
+`!c relog` : recalculate and update all count logs in `<your_log_channel>`
+"""
+    await ctx.send(help_msg)
+
 @c_group.command(name="setup")
 async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: discord.TextChannel = None):
     """
