@@ -157,10 +157,12 @@ async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: 
     }
     save_config(config)
 
+    """
     try:
         await ctx.message.delete()
     except discord.Forbidden:
         log("💔 This bot can't delete messages")
+    """
 
     try:
         await ctx.send(
@@ -186,10 +188,12 @@ async def relog(ctx):
         return
     """
 
+    """
     try:
         await ctx.message.delete()
     except discord.Forbidden:
         log("💔 This bot can't delete messages")
+    """
 
     # Clear daily counts for this guild only
     keys_to_remove = [k for k in daily_counts if k.startswith(f"{guild_id}:")]
