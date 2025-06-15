@@ -129,9 +129,21 @@ async def c_group(ctx):
     await ctx.send("⚠️ Use `!c setup` or `!c relog`")
 
 @c_group.command(name="setup")
-async def setup(ctx, log_channel: discord.TextChannel, counting_channel: discord.TextChannel):
+async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: discord.TextChannel = None):
+    """
     if not log_channel or not counting_channel:
         await ctx.send("⚠️ Invalid format! Try: `!c setup #your_log_channel #your_counting_channel`")
+        return
+    """
+    guild_id = str(ctx.guild.id)
+
+    if not log_channel or not counting_channel:
+        guild_cfg = config.get(guild_id)
+
+        if guild_cfg is None:
+            await ctx.send("❗ This server hasn't been set up yet! Use: `!c setup #your_log_channel #your_counting_channel`")
+        else:
+            await ctx.send(f"📤 Log Channel: <#{guild_cfg.get('log_channel_id')}>, Counting Channel: <#{guild_cfg.get('counting_channel_id')}>")
         return
     
     # Only admins can do this!
@@ -139,7 +151,6 @@ async def setup(ctx, log_channel: discord.TextChannel, counting_channel: discord
         await ctx.send("🚫 You need admin perms to run this!")
         return
 
-    guild_id = str(ctx.guild.id)
     config[guild_id] = {
         "log_channel_id": log_channel.id,
         "counting_channel_id": counting_channel.id
@@ -152,11 +163,11 @@ async def setup(ctx, log_channel: discord.TextChannel, counting_channel: discord
         log("💔 This bot can't delete messages")
 
     try:
-        await ctx.author.send(
+        await ctx.send(
             f"✅ Setup complete!\nLog Channel: {log_channel.mention}\nCounting Channel: {counting_channel.mention}"
         )
     except discord.Forbidden:
-        log("💔 This bot couldn't DM the user")
+        log("💔 This bot couldn't send messages")
 
 
 @c_group.command(name="relog")
@@ -230,11 +241,11 @@ async def relog(ctx):
             await log_channel.send(log_msg)
 
     try:
-        await ctx.author.send(
-            "📤 Relog complete! Check the log channel for updated counts"
+        await ctx.send(
+            "📤 Relog complete! Check the log channel for all updated counts"
         )
     except discord.Forbidden:
-        log("💔 This bot couldn't DM the user")
+        log("💔 This bot couldn't send messages")
 
 
 @bot.tree.command(
@@ -328,7 +339,7 @@ async def slash_relog(interaction: discord.Interaction):
         else:
             await log_channel.send(log_msg)
 
-    await interaction.followup.send("📤 Relog complete! Check the log channel for updated counts", ephemeral=True)
+    await interaction.followup.send("📤 Relog complete! Check the log channel for all updated counts", ephemeral=True)
 
 def generate_log_message(year, counts):
     msg = f"**📊 Year `{year}` Count Log:**\n"
