@@ -70,7 +70,7 @@ async def on_ready():
     await asyncio.sleep(1)
 
     synced = await bot.tree.sync()
-    log(f"✅ Globally synced: {[cmd.name for cmd in synced]}")
+    log(f"✅ Globally synced commands: {[cmd.name for cmd in synced]}")
 
     log_daily_counts.start()
 
@@ -331,8 +331,8 @@ async def slash_relog(interaction: discord.Interaction):
     await interaction.followup.send("📤 Relog complete! Check the log channel for updated counts", ephemeral=True)
 
 def generate_log_message(year, counts):
-    msg = f"`日にち/date : 合計/sum    (5minutes change)`\n"
-    msg += f"**📊 Year `{year}` Count Log:**\n"
+    msg = f"**📊 Year `{year}` Count Log:**\n"
+    msg += f"`日にち/date : 合計/sum  (5minutes change)`\n"
     for date, count in sorted(counts.items()):
         msg += f"`{date}` : **{count}**\n"
     return msg
