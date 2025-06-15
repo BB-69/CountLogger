@@ -56,7 +56,7 @@ def is_number(msg):
         return False
 
 def log(msg):
-    print("[CountLogger]: {msg}")
+    print(f"[CountLogger]: {msg}")
 
 
 @bot.event
