@@ -1,0 +1,24 @@
+# Python junk
+__pycache__/
+*.py[cod]
+*.log
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# Env and secrets
+.env
+*.env
+
+# Config/data (local only!)
+config.json
+data.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+env/
