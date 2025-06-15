@@ -130,21 +130,38 @@ async def c_group(ctx):
 
 @c_group.command(name="help")
 async def help_command(ctx):
+    if not ctx.author.guild_permissions.administrator:
+        # await ctx.send("🚫 You need admin perms to run this!")
+        return
+
     help_msg = """
 A bot that can log progress of a counting channel in your guild!
 
-**-USAGE-**
+## **-USAGE-**
 Let it run and it will automatically update your logs every `5 minutes`
 
-**-COMMAND-**
+## **-COMMAND-**
 `!c setup` : view your current channel set up
 `!c setup <your_log_channel> <your_counting_channel>` : set each specified channel as current
 `!c relog` : recalculate and update all count logs in `<your_log_channel>`
+
+## **-FORMAT-**
+**📊 Year `<year>` Count Log:**
+`日にち/date : 合計/sum  (5minutes change)`
+`YYYY/MM/DD` : `<count>`
+
+### **-DISCLAIMER-**
+This will currently detect **all** the number in `<your_counting_channel>` regardless of order.
+We recommend using another bot with proper counting rules checking for now.
 """
     await ctx.send(help_msg)
 
 @c_group.command(name="setup")
 async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: discord.TextChannel = None):
+    if not ctx.author.guild_permissions.administrator:
+        # await ctx.send("🚫 You need admin perms to run this!")
+        return
+
     """
     if not log_channel or not counting_channel:
         await ctx.send("⚠️ Invalid format! Try: `!c setup #your_log_channel #your_counting_channel`")
@@ -159,11 +176,6 @@ async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: 
             await ctx.send("❗ This server hasn't been set up yet! Use: `!c setup #your_log_channel #your_counting_channel`")
         else:
             await ctx.send(f"📤 Log Channel: <#{guild_cfg.get('log_channel_id')}>, Counting Channel: <#{guild_cfg.get('counting_channel_id')}>")
-        return
-    
-    # Only admins can do this!
-    if not ctx.author.guild_permissions.administrator:
-        await ctx.send("🚫 You need admin perms to run this!")
         return
 
     config[guild_id] = {
@@ -189,6 +201,10 @@ async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: 
 
 @c_group.command(name="relog")
 async def relog(ctx):
+    if not ctx.author.guild_permissions.administrator:
+        # await ctx.send("🚫 You need admin perms to run this!")
+        return
+
     guild_id = str(ctx.guild.id)
 
     if guild_id not in config:
