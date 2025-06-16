@@ -434,6 +434,8 @@ async def slash_setup_info(interaction: discord.Interaction):
     description="Recalculate and update all count logs"
 )
 async def slash_relog(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
     guild_id = str(interaction.guild.id)
 
     if guild_id not in config:
@@ -447,8 +449,6 @@ async def slash_relog(interaction: discord.Interaction):
         await interaction.response.send_message("❗ Please run this command in the **log channel**!", ephemeral=True)
         return
     """
-
-    await interaction.response.defer(ephemeral=True)
 
     # Clear all daily_counts only for this guild
     keys_to_remove = [k for k in daily_counts if k.startswith(f"{guild_id}:")]
