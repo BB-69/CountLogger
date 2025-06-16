@@ -378,8 +378,8 @@ Let it run and it will automatically update your logs every `5 minutes`
 `YYYY/MM/DD` : `<total_count> (<count>)`
 
 ### **-DISCLAIMER-**
-This will currently detect **all** the number in `<your_counting_channel>` regardless of order.
-We recommend using another bot with proper counting rules checking for now.
+This will currently detect numbers in `<your_counting_channel>` regardless of order.
+We recommend using another helping bot with proper counting rules checking alongside this one.
 """
     await ctx.send(help_msg)
 
@@ -511,7 +511,7 @@ def generate_log_message(year, counts):
 
         # ✨ Add separator every 5 actual data lines
         if data_line_count % 5 == 0:
-            msg_lines.append(f"-# {data_line_count}")
+            msg_lines.append(f"-# -{data_line_count}-")
 
         # 📦 Chunk every 50 data lines
         if data_line_count >= 50:
