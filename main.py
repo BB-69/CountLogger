@@ -162,6 +162,8 @@ async def log_daily_counts():
         if not log_channel:
             continue
 
+        recent_bot_msgs = [msg async for msg in log_channel.history(limit=100) if msg.author == bot.user]
+
         year_now = datetime.now(tz).year
 
         # Only get the counts for this guild + year
@@ -172,12 +174,12 @@ async def log_daily_counts():
             if date_key.startswith(prefix)
         }
 
-        log_msgs = generate_log_message(year, year_counts)
+        log_msgs = generate_log_message(year_now, counts)
 
         for i, msg in enumerate(log_msgs):
             found = False
             for existing in recent_bot_msgs:
-                if f"**📊 Year `{year} ({i+1})` Count Log:**" in existing.content:
+                if f"**📊 Year `{year_now} ({i+1})` Count Log:**" in existing.content:
                     await existing.edit(content=msg)
                     found = True
                     break
