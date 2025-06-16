@@ -353,7 +353,7 @@ async def relog(ctx):
 
 
 @bot.tree.command(
-    name="help",
+    name="helpcmd",
     description="Show a full guide about this bot"
 )
 async def slash_help_command(ctx):
