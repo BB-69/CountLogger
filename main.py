@@ -143,14 +143,17 @@ async def do_relog_for_guild(guild_id):
             if k.startswith(prefix)
         }
 
-        log_msg = generate_log_message(year, year_counts)
+        log_msgs = generate_log_message(year, year_counts)
 
-        for msg in recent_bot_msgs:
-            if f"**📊 Year `{year}` Count Log:**" in msg.content:
-                await msg.edit(content=log_msg)
-                break
-        else:
-            await log_channel.send(log_msg)
+        for i, msg in enumerate(log_msgs):
+            found = False
+            for existing in recent_bot_msgs:
+                if f"**📊 Year `{year} ({i+1})` Count Log:**" in existing.content:
+                    await existing.edit(content=msg)
+                    found = True
+                    break
+            if not found:
+                await log_channel.send(msg)
 
     log(f"Relog complete for guild {guild_id}")
 
