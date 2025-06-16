@@ -389,7 +389,7 @@ Let it run and it will automatically update your logs every `5 minutes`
 This will currently detect numbers in `<your_counting_channel>` regardless of order.
 We recommend using another helping bot with proper counting rules checking alongside this one.
 """
-    await interaction.response.send_message(help_msg, ephemeral=True)
+    await interaction.followup.send(help_msg, ephemeral=True)
 
 @bot.tree.command(
     name="setup",
@@ -414,7 +414,7 @@ async def slash_setup(interaction: discord.Interaction, log_channel: discord.Tex
         if guild_cfg is None:
             await interaction.followup.send("❗ This server hasn't been set up yet! Use: `!c setup #your_log_channel #your_counting_channel`", ephemeral=True)
         else:
-            await interaction.followup.send_message(f"📤 Log Channel: <#{guild_cfg.get('log_channel_id')}>, Counting Channel: <#{guild_cfg.get('counting_channel_id')}>", ephemeral=True)
+            await interaction.followup.send(f"📤 Log Channel: <#{guild_cfg.get('log_channel_id')}>, Counting Channel: <#{guild_cfg.get('counting_channel_id')}>", ephemeral=True)
         return
 
     config[guild_id] = {
@@ -445,7 +445,7 @@ async def slash_setupinfo(interaction: discord.Interaction):
     if guild_cfg is None:
         await interaction.followup.send("❗ This server hasn't been set up yet! Use: `!c setup #your_log_channel #your_counting_channel`", ephemeral=True)
     else:
-        await interaction.response.send_message(f"📤 Log Channel: <#{guild_cfg.get('log_channel_id')}>, Counting Channel: <#{guild_cfg.get('counting_channel_id')}>", ephemeral=True)
+        await interaction.followup.send(f"📤 Log Channel: <#{guild_cfg.get('log_channel_id')}>, Counting Channel: <#{guild_cfg.get('counting_channel_id')}>", ephemeral=True)
     return
 
 @bot.tree.command(
