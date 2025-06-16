@@ -60,21 +60,8 @@ def log(msg):
 
 BOT_OWNER_ID = os.getenv("BOT_OWNER_ID")
 
-def is_admin_or_owner():
-    # Used when put @is_admin_or_owner() above the command function
-    """
-    async def predicate(ctx):
-        return (
-            ctx.author.id == BOT_OWNER_ID or
-            is_admin_or_owner()
-        )
-    return commands.check(predicate)
-    """
-
-    return (
-        ctx.author.id == BOT_OWNER_ID or
-        is_admin_or_owner()
-    )
+def is_admin_or_owner(user):
+    return user.id == BOT_OWNER_ID or getattr(user.guild_permissions, "administrator", False)
 
 
 @bot.event
@@ -212,7 +199,7 @@ async def log_daily_counts():
 
 @bot.command(name="help")
 async def help_command(ctx):
-    if not is_admin_or_owner():
+    if not is_admin_or_owner(ctx.author):
         # await ctx.send("🚫 You need admin perms to run this!")
         return
 
@@ -241,7 +228,7 @@ We recommend using another bot with proper counting rules checking for now.
 
 @bot.command(name="setup")
 async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: discord.TextChannel = None):
-    if not is_admin_or_owner():
+    if not is_admin_or_owner(ctx.author):
         # await ctx.send("🚫 You need admin perms to run this!")
         return
 
@@ -284,7 +271,7 @@ async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: 
 
 @bot.command(name="relog")
 async def relog(ctx):
-    if not is_admin_or_owner():
+    if not is_admin_or_owner(ctx.author):
         # await ctx.send("🚫 You need admin perms to run this!")
         return
 
@@ -375,7 +362,7 @@ async def relog(ctx):
     description="Show a full guide about this bot"
 )
 async def slash_help_command(ctx):
-    if not is_admin_or_owner():
+    if not is_admin_or_owner(ctx.author):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
 
@@ -411,7 +398,7 @@ We recommend using another helping bot with proper counting rules checking along
     counting_channel="Channel where users count numbers"
 )
 async def slash_setup(interaction: discord.Interaction, log_channel: discord.TextChannel, counting_channel: discord.TextChannel):
-    if not is_admin_or_owner():
+    if not is_admin_or_owner(interaction.user):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
     
@@ -441,8 +428,8 @@ async def slash_setup(interaction: discord.Interaction, log_channel: discord.Tex
     name="setupinfo",
     description="Show set counting and log channels of this server"
 )
-async def slash_setup_info(interaction: discord.Interaction):
-    if not is_admin_or_owner():
+async def slash_setupinfo(interaction: discord.Interaction):
+    if not is_admin_or_owner(interaction.user):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
 
@@ -460,7 +447,7 @@ async def slash_setup_info(interaction: discord.Interaction):
     description="Recalculate and update all count logs"
 )
 async def slash_relog(interaction: discord.Interaction):
-    if not is_admin_or_owner():
+    if not is_admin_or_owner(interaction.user):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
 
