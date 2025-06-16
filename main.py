@@ -141,6 +141,7 @@ A bot that can log progress of a counting channel in your guild!
 Let it run and it will automatically update your logs every `5 minutes`
 
 ## **-COMMAND-**
+`!c help` : full guide about this bot
 `!c setup` : view your current channel set up
 `!c setup <your_log_channel> <your_counting_channel>` : set each specified channel as current
 `!c relog` : recalculate and update all count logs in `<your_log_channel>`
