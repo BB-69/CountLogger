@@ -362,6 +362,8 @@ async def relog(ctx):
     description="Show a full guide about this bot"
 )
 async def slash_help_command(ctx):
+    await interaction.response.defer(ephemeral=True)
+    
     if not is_admin_or_owner(ctx.author):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
@@ -398,6 +400,8 @@ We recommend using another helping bot with proper counting rules checking along
     counting_channel="Channel where users count numbers"
 )
 async def slash_setup(interaction: discord.Interaction, log_channel: discord.TextChannel, counting_channel: discord.TextChannel):
+    await interaction.response.defer(ephemeral=True)
+
     if not is_admin_or_owner(interaction.user):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
@@ -429,6 +433,8 @@ async def slash_setup(interaction: discord.Interaction, log_channel: discord.Tex
     description="Show set counting and log channels of this server"
 )
 async def slash_setupinfo(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
     if not is_admin_or_owner(interaction.user):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
@@ -448,7 +454,7 @@ async def slash_setupinfo(interaction: discord.Interaction):
 )
 async def slash_relog(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
-    
+
     if not is_admin_or_owner(interaction.user):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
