@@ -74,6 +74,7 @@ async def on_ready():
 
     for guild_id in config.keys():
         await do_relog_for_guild(guild_id)
+    log("✅ Relog complete for all registered guild!")
     log_daily_counts.start()
 
 @bot.event
