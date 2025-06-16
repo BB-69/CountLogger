@@ -447,11 +447,11 @@ async def slash_setupinfo(interaction: discord.Interaction):
     description="Recalculate and update all count logs"
 )
 async def slash_relog(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    
     if not is_admin_or_owner(interaction.user):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
-
-    await interaction.response.defer(ephemeral=True)
 
     guild_id = str(interaction.guild.id)
 
