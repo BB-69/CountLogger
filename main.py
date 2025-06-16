@@ -65,6 +65,13 @@ def log(msg):
 if sys.platform == "linux":
     asyncio.set_event_loop(asyncio.new_event_loop())
 
+async def heartbeat():
+    while True:
+        print("💓 Event loop heartbeat")
+        await asyncio.sleep(15)
+
+bot.loop.create_task(heartbeat())
+
 @bot.event
 async def on_ready():
     log(f"Now online as {bot.user}!")
