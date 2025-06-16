@@ -399,7 +399,7 @@ We recommend using another helping bot with proper counting rules checking along
     log_channel="Channel where logs are posted",
     counting_channel="Channel where users count numbers"
 )
-async def slash_setup(interaction: discord.Interaction, log_channel: discord.TextChannel, counting_channel: discord.TextChannel):
+async def slash_setup(interaction: discord.Interaction, log_channel: int, counting_channel: int):
     await interaction.response.defer(ephemeral=True)
 
     if not is_admin_or_owner(interaction.user):
