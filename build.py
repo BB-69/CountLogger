@@ -23,7 +23,7 @@ if not os.path.exists("data.json"):
     print("📊 Creating empty data.json...")
     with open("data.json", "w") as f:
         json.dump({}, f, indent=4)
-    print("✅ data.json ready to go!")
+    print("✅ data.json file created!")
 else:
     print("📁 data.json already exists. Skipping creation...")
 
@@ -32,7 +32,7 @@ if not os.path.exists("config.json"):
     print("⚙️ Creating empty config.json...")
     with open("config.json", "w") as f:
         json.dump({}, f, indent=4)
-    print("✅ config.json created!")
+    print("✅ config.json file created!")
 else:
     print("📁 config.json already exists. Skipping creation...")
 
