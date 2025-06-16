@@ -172,18 +172,17 @@ async def log_daily_counts():
             if date_key.startswith(prefix)
         }
 
-        log_msg = generate_log_message(year_now, counts)
+        log_msgs = generate_log_message(year, year_counts)
 
-        # Try to find an existing message to update
-        async for message in log_channel.history(limit=50):
-            if (
-                message.author == bot.user and 
-                f"**📊 Year `{year_now}` Count Log:**" in message.content
-            ):
-                await message.edit(content=log_msg)
-                break
-        else:
-            await log_channel.send(log_msg)
+        for i, msg in enumerate(log_msgs):
+            found = False
+            for existing in recent_bot_msgs:
+                if f"**📊 Year `{year} ({i+1})` Count Log:**" in existing.content:
+                    await existing.edit(content=msg)
+                    found = True
+                    break
+            if not found:
+                await log_channel.send(msg)
 
 
 
@@ -327,15 +326,17 @@ async def relog(ctx):
             if k.startswith(prefix)
         }
 
-        log_msg = generate_log_message(year, year_counts)
+        log_msgs = generate_log_message(year, year_counts)
 
-        # Try to edit existing yearly log message, or send new
-        for msg in recent_bot_msgs:
-            if f"**📊 Year `{year}` Count Log:**" in msg.content:
-                await msg.edit(content=log_msg)
-                break
-        else:
-            await log_channel.send(log_msg)
+        for i, msg in enumerate(log_msgs):
+            found = False
+            for existing in recent_bot_msgs:
+                if f"**📊 Year `{year} ({i+1})` Count Log:**" in existing.content:
+                    await existing.edit(content=msg)
+                    found = True
+                    break
+            if not found:
+                await log_channel.send(msg)
 
     try:
         await ctx.send(
@@ -470,30 +471,51 @@ async def slash_relog(interaction: discord.Interaction):
             if k.startswith(prefix)
         }
 
-        log_msg = generate_log_message(year, year_counts)
+        log_msgs = generate_log_message(year, year_counts)
 
-        for msg in recent_bot_msgs:
-            if f"**📊 Year `{year}` Count Log:**" in msg.content:
-                await msg.edit(content=log_msg)
-                break
-        else:
-            await log_channel.send(log_msg)
+        for i, msg in enumerate(log_msgs):
+            found = False
+            for existing in recent_bot_msgs:
+                if f"**📊 Year `{year} ({i+1})` Count Log:**" in existing.content:
+                    await existing.edit(content=msg)
+                    found = True
+                    break
+            if not found:
+                await log_channel.send(msg)
 
     await interaction.followup.send("📤 Relog complete! Check the log channel for all updated counts", ephemeral=True)
 
 def generate_log_message(year, counts):
-    msg = f"## **📊 Year `{year}` Count Log:**\n"
-    msg += f"`日にち/date : 合計/sum  (5minutes change)`\n"
-
+    base_header = "## **📊 Year `{}` Count Log:**\n`日にち/date : 合計/sum  (5minutes change)`\n"
+    
+    messages = []
+    msg = ""
     prev_count = 0
     sorted_items = sorted(counts.items())
-    for date, count in sorted_items:
-        parts = date.split("/")  # splits it into ['2025', '06', '16']
-        month_day = "/".join(parts[1:])
+    part = 1
 
-        msg += f"`{month_day}` : **{count}** (+{count-prev_count})\n"
-        if count != sorted_items[0]:
-            prev_count = count
-    return msg
+    for i, (date, count) in enumerate(sorted_items):
+        parts = date.split("/")  # ['2025', '06', '16']
+        month_day = "/".join(parts[1:])
+        line = f"`{month_day}` : **{count}** (+{count - prev_count})\n"
+
+        # Check if adding this line would overflow the limit
+        if len(msg) + len(line) > 1900:
+            # Add current msg with part header
+            header = base_header.format(f"{year} ({part})")
+            messages.append(header + msg)
+            msg = ""
+            part += 1
+
+        msg += line
+        prev_count = count
+
+    # Add the last message
+    if msg:
+        header = base_header.format(f"{year} ({part})")
+        messages.append(header + msg)
+
+    return "\n\n".join(messages)
+
 
 bot.run(TOKEN)
