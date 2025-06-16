@@ -21,7 +21,7 @@ intents.message_content = True
 intents.messages = True
 intents.guilds = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!ctl ", intents=intents, help_command=None)
 
 UTC_OFFSET = 9
 tz = timezone(timedelta(hours=UTC_OFFSET))
@@ -124,11 +124,7 @@ async def log_daily_counts():
 
 
 
-@bot.group(name="c", invoke_without_command=True)
-async def c_group(ctx):
-    await ctx.send("⚠️ Use `!c setup` or `!c relog`")
-
-@c_group.command(name="help")
+@bot.command(name="help")
 async def help_command(ctx):
     if not ctx.author.guild_permissions.administrator:
         # await ctx.send("🚫 You need admin perms to run this!")
@@ -149,7 +145,7 @@ Let it run and it will automatically update your logs every `5 minutes`
 ## **-FORMAT-**
 **📊 Year `<year>` Count Log:**
 `日にち/date : 合計/sum  (5minutes change)`
-`YYYY/MM/DD` : `<count>`
+`YYYY/MM/DD` : `<total_count> (<count>)`
 
 ### **-DISCLAIMER-**
 This will currently detect **all** the number in `<your_counting_channel>` regardless of order.
@@ -157,7 +153,7 @@ We recommend using another bot with proper counting rules checking for now.
 """
     await ctx.send(help_msg)
 
-@c_group.command(name="setup")
+@bot.command(name="setup")
 async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: discord.TextChannel = None):
     if not ctx.author.guild_permissions.administrator:
         # await ctx.send("🚫 You need admin perms to run this!")
@@ -200,7 +196,7 @@ async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: 
         log("💔 This bot couldn't send messages")
 
 
-@c_group.command(name="relog")
+@bot.command(name="relog")
 async def relog(ctx):
     if not ctx.author.guild_permissions.administrator:
         # await ctx.send("🚫 You need admin perms to run this!")
@@ -244,7 +240,8 @@ async def relog(ctx):
             msg_date = message.created_at.astimezone(tz)
             day_str = msg_date.strftime("%Y/%m/%d")
             key = f"{guild_id}:{day_str}"
-            daily_counts[key] = daily_counts.get(key, 0) + 1
+            num = int(message.content)
+            daily_counts[key] = num
 
     save_data()
 
@@ -285,6 +282,38 @@ async def relog(ctx):
 
 
 @bot.tree.command(
+    name="help",
+    description="Show a full guide about this bot"
+)
+async def slash_help_command(ctx):
+    if not ctx.author.guild_permissions.administrator:
+        # await ctx.send("🚫 You need admin perms to run this!")
+        return
+
+    help_msg = """
+A bot that can log progress of a counting channel in your guild!
+
+## **-USAGE-**
+Let it run and it will automatically update your logs every `5 minutes`
+
+## **-COMMAND-**
+`/help` : full guide about this bot
+`/setup` : view your current channel set up
+`/setup <your_log_channel> <your_counting_channel>` : set each specified channel as current
+`/relog` : recalculate and update all count logs in `<your_log_channel>`
+
+## **-FORMAT-**
+**📊 Year `<year>` Count Log:**
+`日にち/date : 合計/sum  (5minutes change)`
+`YYYY/MM/DD` : `<total_count> (<count>)`
+
+### **-DISCLAIMER-**
+This will currently detect **all** the number in `<your_counting_channel>` regardless of order.
+We recommend using another bot with proper counting rules checking for now.
+"""
+    await ctx.send(help_msg)
+
+@bot.tree.command(
     name="setup",
     description="Set counting and log channels for this server"
 )
@@ -294,6 +323,15 @@ async def relog(ctx):
 )
 async def slash_setup(interaction: discord.Interaction, log_channel: discord.TextChannel, counting_channel: discord.TextChannel):
     guild_id = str(interaction.guild.id)
+
+    if not log_channel or not counting_channel:
+        guild_cfg = config.get(guild_id)
+
+        if guild_cfg is None:
+            await ctx.send("❗ This server hasn't been set up yet! Use: `!c setup #your_log_channel #your_counting_channel`")
+        else:
+            await ctx.send(f"📤 Log Channel: <#{guild_cfg.get('log_channel_id')}>, Counting Channel: <#{guild_cfg.get('counting_channel_id')}>")
+        return
 
     config[guild_id] = {
         "log_channel_id": log_channel.id,
@@ -344,7 +382,8 @@ async def slash_relog(interaction: discord.Interaction):
             msg_date = message.created_at.astimezone(tz)
             day_str = msg_date.strftime("%Y/%m/%d")
             key = f"{guild_id}:{day_str}"
-            daily_counts[key] = daily_counts.get(key, 0) + 1
+            num = int(message.content)
+            daily_counts[key] = num
 
     save_data()
 
@@ -380,8 +419,11 @@ async def slash_relog(interaction: discord.Interaction):
 def generate_log_message(year, counts):
     msg = f"**📊 Year `{year}` Count Log:**\n"
     msg += f"`日にち/date : 合計/sum  (5minutes change)`\n"
+
+    total = 0
     for date, count in sorted(counts.items()):
-        msg += f"`{date}` : **{count}**\n"
+        total += count
+        msg += f"`{date}` : **{total} ({count})**\n"
     return msg
 
 bot.run(TOKEN)
