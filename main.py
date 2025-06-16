@@ -72,6 +72,8 @@ async def on_ready():
     synced = await bot.tree.sync()
     log(f"✅ Globally synced commands: {[cmd.name for cmd in synced]}")
 
+    for guild_id in config.keys():
+        await do_relog_for_guild(guild_id)
     log_daily_counts.start()
 
 @bot.event
@@ -87,10 +89,71 @@ async def on_message(message):
     if message.channel.id == guild_cfg["counting_channel_id"] and is_number(message.content):
         today = datetime.now(tz).strftime("%Y/%m/%d")
         key = f"{guild_id}:{today}"
-        daily_counts[key] = daily_counts.get(key, 0) + 1
+        num = int(message.content)
+        if key not in daily_counts or num > daily_counts[key]:
+            daily_counts[key] = num
         save_data()
 
     await bot.process_commands(message)
+
+async def do_relog_for_guild(guild_id):
+    if guild_id not in config:
+        log(f"Guild {guild_id} not configured yet, skipping relog")
+        return
+    
+    cfg = config[guild_id]
+    counting_channel = bot.get_channel(cfg["counting_channel_id"])
+    if not counting_channel:
+        log(f"Counting channel not found for guild {guild_id}")
+        return
+
+    # Clear previous counts
+    keys_to_remove = [k for k in daily_counts if k.startswith(f"{guild_id}:")]
+    for k in keys_to_remove:
+        del daily_counts[k]
+
+    # Revert to incrementing for each message
+    async for message in counting_channel.history(limit=None, oldest_first=True):
+        if message.author.bot:
+            continue
+        if message.content.isdigit():
+            msg_date = message.created_at.astimezone(tz)
+            day_str = msg_date.strftime("%Y/%m/%d")
+            key = f"{guild_id}:{day_str}"
+            num = int(message.content)
+            if key not in daily_counts or num > daily_counts[key]:
+                daily_counts[key] = num
+
+    save_data()
+
+    # Logging same as before
+    years = sorted({int(k.split(":")[1].split("/")[0]) for k in daily_counts if k.startswith(f"{guild_id}:")})
+    log_channel = bot.get_channel(cfg["log_channel_id"])
+    if not log_channel:
+        log(f"Log channel not found for guild {guild_id}")
+        return
+
+    recent_bot_msgs = [msg async for msg in log_channel.history(limit=100) if msg.author == bot.user]
+
+    for year in years:
+        prefix = f"{guild_id}:{year}"
+        year_counts = {
+            k.split(":")[1]: count
+            for k, count in daily_counts.items()
+            if k.startswith(prefix)
+        }
+
+        log_msg = generate_log_message(year, year_counts)
+
+        for msg in recent_bot_msgs:
+            if f"**📊 Year `{year}` Count Log:**" in msg.content:
+                await msg.edit(content=log_msg)
+                break
+        else:
+            await log_channel.send(log_msg)
+
+    log(f"Relog complete for guild {guild_id}")
+
 
 @tasks.loop(minutes=5)
 async def log_daily_counts():
@@ -240,7 +303,9 @@ async def relog(ctx):
             msg_date = message.created_at.astimezone(tz)
             day_str = msg_date.strftime("%Y/%m/%d")
             key = f"{guild_id}:{day_str}"
-            daily_counts[key] = daily_counts.get(key, 0) + 1
+            num = int(message.content)
+            if key not in daily_counts or num > daily_counts[key]:
+                daily_counts[key] = num
 
     save_data()
 
@@ -381,7 +446,9 @@ async def slash_relog(interaction: discord.Interaction):
             msg_date = message.created_at.astimezone(tz)
             day_str = msg_date.strftime("%Y/%m/%d")
             key = f"{guild_id}:{day_str}"
-            daily_counts[key] = daily_counts.get(key, 0) + 1
+            num = int(message.content)
+            if key not in daily_counts or num > daily_counts[key]:
+                daily_counts[key] = num
 
     save_data()
 
@@ -418,10 +485,12 @@ def generate_log_message(year, counts):
     msg = f"**📊 Year `{year}` Count Log:**\n"
     msg += f"`日にち/date : 合計/sum  (5minutes change)`\n"
 
-    total = 0
-    for date, count in sorted(counts.items()):
-        total += count
-        msg += f"`{date}` : **{total} ({count})**\n"
+    prev_count = 0
+    sorted_items = sorted(counts.items())
+    for date, count in sorted_items:
+        msg += f"`{date}` : **{count}** (+{count-prev_count})\n"
+        if count != sorted_items[0]:
+            prev_count = count
     return msg
 
 bot.run(TOKEN)
