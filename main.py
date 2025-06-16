@@ -482,13 +482,16 @@ async def slash_relog(interaction: discord.Interaction):
     await interaction.followup.send("📤 Relog complete! Check the log channel for all updated counts", ephemeral=True)
 
 def generate_log_message(year, counts):
-    msg = f"**📊 Year `{year}` Count Log:**\n"
+    msg = f"## **📊 Year `{year}` Count Log:**\n"
     msg += f"`日にち/date : 合計/sum  (5minutes change)`\n"
 
     prev_count = 0
     sorted_items = sorted(counts.items())
     for date, count in sorted_items:
-        msg += f"`{date}` : **{count}** (+{count-prev_count})\n"
+        parts = date.split("/")  # splits it into ['2025', '06', '16']
+        month_day = "/".join(parts[1:])
+
+        msg += f"`{month_day}` : **{count}** (+{count-prev_count})\n"
         if count != sorted_items[0]:
             prev_count = count
     return msg
