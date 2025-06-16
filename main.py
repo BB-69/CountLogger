@@ -58,6 +58,24 @@ def is_number(msg):
 def log(msg):
     print(f"[CountLogger]: {msg}")
 
+BOT_OWNER_ID = os.getenv("BOT_OWNER_ID")
+
+def is_admin_or_owner():
+    # Used when put @is_admin_or_owner() above the command function
+    """
+    async def predicate(ctx):
+        return (
+            ctx.author.id == BOT_OWNER_ID or
+            is_admin_or_owner()
+        )
+    return commands.check(predicate)
+    """
+
+    return (
+        ctx.author.id == BOT_OWNER_ID or
+        is_admin_or_owner()
+    )
+
 
 @bot.event
 async def on_ready():
@@ -194,7 +212,7 @@ async def log_daily_counts():
 
 @bot.command(name="help")
 async def help_command(ctx):
-    if not ctx.author.guild_permissions.administrator:
+    if not is_admin_or_owner():
         # await ctx.send("🚫 You need admin perms to run this!")
         return
 
@@ -223,7 +241,7 @@ We recommend using another bot with proper counting rules checking for now.
 
 @bot.command(name="setup")
 async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: discord.TextChannel = None):
-    if not ctx.author.guild_permissions.administrator:
+    if not is_admin_or_owner():
         # await ctx.send("🚫 You need admin perms to run this!")
         return
 
@@ -266,7 +284,7 @@ async def setup(ctx, log_channel: discord.TextChannel = None, counting_channel: 
 
 @bot.command(name="relog")
 async def relog(ctx):
-    if not ctx.author.guild_permissions.administrator:
+    if not is_admin_or_owner():
         # await ctx.send("🚫 You need admin perms to run this!")
         return
 
@@ -357,8 +375,8 @@ async def relog(ctx):
     description="Show a full guide about this bot"
 )
 async def slash_help_command(ctx):
-    if not ctx.author.guild_permissions.administrator:
-        # await ctx.send("🚫 You need admin perms to run this!")
+    if not is_admin_or_owner():
+        await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
 
     help_msg = """
@@ -393,6 +411,10 @@ We recommend using another helping bot with proper counting rules checking along
     counting_channel="Channel where users count numbers"
 )
 async def slash_setup(interaction: discord.Interaction, log_channel: discord.TextChannel, counting_channel: discord.TextChannel):
+    if not is_admin_or_owner():
+        await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
+        return
+    
     guild_id = str(interaction.guild.id)
 
     if not log_channel or not counting_channel:
@@ -420,6 +442,10 @@ async def slash_setup(interaction: discord.Interaction, log_channel: discord.Tex
     description="Show set counting and log channels of this server"
 )
 async def slash_setup_info(interaction: discord.Interaction):
+    if not is_admin_or_owner():
+        await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
+        return
+
     guild_id = str(interaction.guild.id)
     guild_cfg = config.get(guild_id)
 
@@ -434,6 +460,10 @@ async def slash_setup_info(interaction: discord.Interaction):
     description="Recalculate and update all count logs"
 )
 async def slash_relog(interaction: discord.Interaction):
+    if not is_admin_or_owner():
+        await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
+        return
+
     await interaction.response.defer(ephemeral=True)
 
     guild_id = str(interaction.guild.id)

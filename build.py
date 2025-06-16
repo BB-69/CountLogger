@@ -9,10 +9,12 @@ if not os.path.exists(".env"):
     print("🔐 Let's get your bot connected~")
     token = input("📝 Enter your Discord Bot Token: ").strip()
     guild_id = input("📝 Enter your Guild (Server) ID: ").strip()
+    owner_id = input("📝 Enter your ID (Bot Owner): ").strip()
 
     with open(".env", "w") as f:
         f.write(f"DISCORD_TOKEN={token}\n")
         f.write(f"TEST_GUILD_ID={guild_id}\n")
+        f.write(f"BOT_OWNER_ID={owner_id}\n")
     print("✅ .env file created!")
 
 else:
