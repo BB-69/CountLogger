@@ -103,7 +103,7 @@ async def do_relog_for_guild(guild_id):
         return
     
     cfg = config[guild_id]
-    counting_channel = bot.get_channel(cfg["counting_channel_id"])
+    counting_channel = await bot.fetch_channel(cfg["counting_channel_id"])
     if not counting_channel:
         log(f"Counting channel not found for guild {guild_id}")
         return
@@ -129,7 +129,7 @@ async def do_relog_for_guild(guild_id):
 
     # Logging same as before
     years = sorted({int(k.split(":")[1].split("/")[0]) for k in daily_counts if k.startswith(f"{guild_id}:")})
-    log_channel = bot.get_channel(cfg["log_channel_id"])
+    log_channel = await bot.fetch_channel(cfg["log_channel_id"])
     if not log_channel:
         log(f"Log channel not found for guild {guild_id}")
         return
@@ -162,7 +162,7 @@ async def do_relog_for_guild(guild_id):
 @tasks.loop(minutes=5)
 async def log_daily_counts():
     for guild_id, cfg in config.items():
-        log_channel = bot.get_channel(cfg["log_channel_id"])
+        log_channel = await bot.fetch_channel(cfg["log_channel_id"])
         if not log_channel:
             continue
 
@@ -296,7 +296,7 @@ async def relog(ctx):
     for k in keys_to_remove:
         del daily_counts[k]
 
-    counting_channel = bot.get_channel(cfg["counting_channel_id"])
+    counting_channel = await bot.fetch_channel(cfg["counting_channel_id"])
     if not counting_channel:
         await ctx.send("❓ Counting channel not found")
         return
@@ -317,7 +317,7 @@ async def relog(ctx):
     # Get all unique years for this guild
     years = sorted({int(k.split(":")[1].split("/")[0]) for k in daily_counts if k.startswith(f"{guild_id}:")})
 
-    log_channel = bot.get_channel(cfg["log_channel_id"])
+    log_channel = await bot.fetch_channel(cfg["log_channel_id"])
     if not log_channel:
         await ctx.send("❓ Log channel not found")
         return
@@ -441,7 +441,7 @@ async def slash_relog(interaction: discord.Interaction):
     for k in keys_to_remove:
         del daily_counts[k]
 
-    counting_channel = bot.get_channel(cfg["counting_channel_id"])
+    counting_channel = await bot.fetch_channel(cfg["counting_channel_id"])
     if not counting_channel:
         await interaction.followup.send("❓ Counting channel not found", ephemeral=True)
         return
@@ -462,7 +462,7 @@ async def slash_relog(interaction: discord.Interaction):
     # Get all unique years for this guild
     years = sorted({int(k.split(":")[1].split("/")[0]) for k in daily_counts if k.startswith(f"{guild_id}:")})
 
-    log_channel = bot.get_channel(cfg["log_channel_id"])
+    log_channel = await bot.fetch_channel(cfg["log_channel_id"])
     if not log_channel:
         await interaction.followup.send("❓ Log channel not found", ephemeral=True)
         return
