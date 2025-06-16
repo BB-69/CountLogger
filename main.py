@@ -60,6 +60,10 @@ def log(msg):
 
 
 @bot.event
+async def on_socket_raw_receive(payload):
+    log(f"[RAW RECEIVE]: {payload[:200]}")
+
+@bot.event
 async def on_ready():
     log(f"Now online as {bot.user}!")
     await bot.change_presence(
