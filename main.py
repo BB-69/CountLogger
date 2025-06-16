@@ -416,6 +416,20 @@ async def slash_setup(interaction: discord.Interaction, log_channel: discord.Tex
     )
 
 @bot.tree.command(
+    name="setupinfo",
+    description="Show set counting and log channels of this server"
+)
+async def slash_setup_info(interaction: discord.Interaction):
+    guild_id = str(interaction.guild.id)
+    guild_cfg = config.get(guild_id)
+
+    if guild_cfg is None:
+        await ctx.send("❗ This server hasn't been set up yet! Use: `!c setup #your_log_channel #your_counting_channel`")
+    else:
+        await ctx.send(f"📤 Log Channel: <#{guild_cfg.get('log_channel_id')}>, Counting Channel: <#{guild_cfg.get('counting_channel_id')}>")
+    return
+
+@bot.tree.command(
     name="relog",
     description="Recalculate and update all count logs"
 )
