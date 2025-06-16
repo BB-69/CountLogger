@@ -517,7 +517,7 @@ def generate_log_message(year, counts):
         header = base_header.format(f"{year} ({part})")
         messages.append(header + msg)
 
-    return "\n\n".join(messages)
+    return messages
 
 
 bot.run(TOKEN)
