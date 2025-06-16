@@ -492,9 +492,10 @@ async def slash_relog(interaction: discord.Interaction):
 
 def generate_log_message(year, counts):
     base_header = "## **📊 Year `{}` Count Log:**\n`日にち/date : 合計/sum  (5minutes change)`\n"
-    
+
     messages = []
-    msg = ""
+    msg_lines = []
+    data_line_count = 0
     prev_count = 0
     sorted_items = sorted(counts.items())
     part = 1
@@ -502,23 +503,28 @@ def generate_log_message(year, counts):
     for i, (date, count) in enumerate(sorted_items):
         parts = date.split("/")  # ['2025', '06', '16']
         month_day = "/".join(parts[1:])
-        line = f"`{month_day}` : **{count}** (+{count - prev_count})\n"
-
-        # Check if adding this line would overflow the limit
-        if len(msg) + len(line) > 1900:
-            # Add current msg with part header
-            header = base_header.format(f"{year} ({part})")
-            messages.append(header + msg)
-            msg = ""
-            part += 1
-
-        msg += line
+        line = f"`{month_day}` : **{count}** (+{count - prev_count})"
         prev_count = count
 
-    # Add the last message
-    if msg:
+        msg_lines.append(line)
+        data_line_count += 1
+
+        # ✨ Add separator every 5 actual data lines
+        if data_line_count % 5 == 0:
+            msg_lines.append(f"-# {data_line_count}")
+
+        # 📦 Chunk every 50 data lines
+        if data_line_count >= 50:
+            header = base_header.format(f"{year} ({part})")
+            messages.append(header + "\n".join(msg_lines))
+            msg_lines = []
+            data_line_count = 0
+            part += 1
+
+    # 📦 Add leftovers
+    if msg_lines:
         header = base_header.format(f"{year} ({part})")
-        messages.append(header + msg)
+        messages.append(header + "\n".join(msg_lines))
 
     return messages
 
