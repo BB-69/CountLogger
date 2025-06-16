@@ -364,9 +364,11 @@ async def relog(ctx):
 async def slash_help_command(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
+    """
     if not is_admin_or_owner(interaction.user):
         await interaction.followup.send("🚫 You need admin perms to run this!", ephemeral=True)
         return
+    """
 
     help_msg = """
 A bot that can log progress of a counting channel in your guild!
