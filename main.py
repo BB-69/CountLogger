@@ -7,6 +7,9 @@ import json
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
+import asyncio
+import sys
+
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -58,6 +61,16 @@ def is_number(msg):
 def log(msg):
     print(f"[CountLogger]: {msg}")
 
+
+if sys.platform == "linux":
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+async def heartbeat():
+    while True:
+        print("💓 Event loop heartbeat")
+        await asyncio.sleep(15)
+
+bot.loop.create_task(heartbeat())
 
 @bot.event
 async def on_ready():
