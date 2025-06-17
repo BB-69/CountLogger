@@ -578,10 +578,9 @@ def generate_log_message(year, counts):
     data_line_count = 0
     prev_count = 0
     sorted_items = sorted(counts.items())
-    valid_streak = get_valid_streak(sorted_items)
     part = 1
 
-    for i, (date, count) in enumerate(valid_streak):
+    for i, (date, count) in enumerate(sorted_items):
         parts = date.split("/")  # ['2025', '06', '16']
         month_day = "/".join(parts[1:])
         line = f"`{month_day}` : **{count}** (+{count - prev_count})"
