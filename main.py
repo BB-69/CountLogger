@@ -55,6 +55,46 @@ def is_number(msg):
     except:
         return False
 
+def find_valid_last_number(numbers: list[int], index: int = -1) -> int:
+    if len(numbers) < 2:
+        return numbers[-1] if numbers else 0
+
+    last = numbers[index]
+    second_last = numbers[index - 1]
+
+    if last == second_last + 1:
+        return last
+    else:
+        return find_valid_last_number(numbers, index - 1)
+
+def find_valid_last_number_from_sorted(sorted_items: list[tuple[str, int]], index: int = -1) -> tuple[str, int]:
+    if len(sorted_items) < 2:
+        return sorted_items[-1] if sorted_items else ("", 0)
+
+    last_date, last_count = sorted_items[index]
+    prev_date, prev_count = sorted_items[index - 1]
+
+    if last_count == prev_count + 1:
+        return (last_date, last_count)
+    else:
+        return find_valid_last_number_from_sorted(sorted_items, index - 1)
+
+def get_valid_streak(sorted_items: list[tuple[str, int]]) -> list[tuple[str, int]]:
+    if not sorted_items:
+        return []
+
+    valid_streak = [sorted_items[0]]
+    for i in range(1, len(sorted_items)):
+        prev_count = valid_streak[-1][1]
+        current_date, current_count = sorted_items[i]
+        
+        if current_count == prev_count + 1:
+            valid_streak.append((current_date, current_count))
+        else:
+            break
+
+    return valid_streak
+
 def log(msg):
     print(f"[CountLogger]: {msg}")
 
@@ -538,9 +578,10 @@ def generate_log_message(year, counts):
     data_line_count = 0
     prev_count = 0
     sorted_items = sorted(counts.items())
+    valid_streak = get_valid_streak(sorted_items)
     part = 1
 
-    for i, (date, count) in enumerate(sorted_items):
+    for i, (date, count) in enumerate(valid_streak):
         parts = date.split("/")  # ['2025', '06', '16']
         month_day = "/".join(parts[1:])
         line = f"`{month_day}` : **{count}** (+{count - prev_count})"
