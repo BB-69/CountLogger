@@ -216,13 +216,13 @@ Let it run and it will automatically update your logs every `5 minutes`
 `!c relog` : recalculate and update all count logs in `<your_log_channel>`
 
 ## **-FORMAT-**
-**📊 Year `<year>` Count Log:**
+**📊 Year `<year> (iteration)` Count Log:**
 `日にち/date : 合計/sum  (5minutes change)`
 `YYYY/MM/DD` : `<total_count> (<count>)`
 
 ### **-DISCLAIMER-**
-This will currently detect **all** the number in `<your_counting_channel>` regardless of order.
-We recommend using another bot with proper counting rules checking for now.
+This will currently detect last number of each day in `<your_counting_channel>` regardless of order.
+We recommend using another helping bot with proper counting rules checking alongside this one.
 """
     await ctx.send(help_msg)
 
@@ -383,12 +383,12 @@ Let it run and it will automatically update your logs every `5 minutes`
 `/relog` : recalculate and update all count logs in `<your_log_channel>`
 
 ## **-FORMAT-**
-**📊 Year `<year>` Count Log:**
+**📊 Year `<year> (iteration)` Count Log:**
 `日にち/date : 合計/sum  (5minutes change)`
 `YYYY/MM/DD` : `<total_count> (<count>)`
 
 ### **-DISCLAIMER-**
-This will currently detect numbers in `<your_counting_channel>` regardless of order.
+This will currently detect last number of each day in `<your_counting_channel>` regardless of order.
 We recommend using another helping bot with proper counting rules checking alongside this one.
 """
     await interaction.followup.send(help_msg, ephemeral=True)
