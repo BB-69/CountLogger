@@ -50,10 +50,10 @@ A discord bot that can log progress of a counting channel in your guild!
 > Haven't settle commands type yet...
 
 * Text commands:
-    * `!c help` : full guide about this bot
-    * `!c setup` : view your current channel set up
-    * `!c setup <your_log_channel> <your_counting_channel>` : set each specified channel as current
-    * `!c relog` : recalculate and update all count logs in `<your_log_channel>`
+    * `!ctl help` : full guide about this bot
+    * `!ctl setup` : view your current channel set up
+    * `!ctl setup <your_log_channel> <your_counting_channel>` : set each specified channel as current
+    * `!ctl relog` : recalculate and update all count logs in `<your_log_channel>`
 
 * Slash commands:
     * `/helpcmd` : full guide about this bot
