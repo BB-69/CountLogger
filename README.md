@@ -4,6 +4,9 @@ A discord bot that can log progress of a counting channel in your guild!
 <img src="https://github.com/user-attachments/assets/ee97a8b5-efb2-4f5c-806e-d02a4a4ab672" width="200">
 
 ## 🪀 Features
+
+<img src="https://github.com/user-attachments/assets/c12a75c2-de35-4b5e-a216-e8b512b22022" height="200">
+
 * Tracks and logs daily total from a counting channel.
 * Sends logs to a specific log channel & update it every certain interval `(current: 5 minutes)`.
 * Customizable channel IDs via config.
