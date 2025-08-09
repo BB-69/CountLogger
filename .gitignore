@@ -1,8 +1,3 @@
-# Python junk
-__pycache__/
-*.py[cod]
-*.log
-
 # VSCode / IDE
 .vscode/
 .idea/
@@ -11,9 +6,9 @@ __pycache__/
 .env
 *.env
 
-# Config/data (local only!)
-config.json
+# Data (local only!)
 data.json
+data/config.json
 
 # OS files
 .DS_Store
@@ -22,3 +17,6 @@ Thumbs.db
 # Virtual environments
 venv/
 env/
+
+# Cargo
+/target
