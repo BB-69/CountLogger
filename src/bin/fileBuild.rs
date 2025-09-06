@@ -22,37 +22,20 @@ fn main() {
     println!("Creating '.env' ..."); {
         let path = ".env";
 
-        let mut answer = String::new();
-        answer = loop {
-            let ans = if answer.is_empty() {
-                get_input(&format!("'{}' already exists! Edit file anyway? (Y/N): ", path))
-            } else {
-                get_input("Edit file anyway? (Y/N): ")
-            }.to_uppercase();
+        let discord_token = get_input("Enter your DISCORD_TOKEN: ");
+        let test_guild_id = get_input("Enter your TEST_GUILD_ID: ");
 
-            if ans == "Y" || ans == "N" {
-                break ans;
-            } else {
-                println!("Invalid answer");
-            }
-        };
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(".env")
+            .unwrap();
 
-        if answer == "Y" {
-            let discord_token = get_input("Enter your DISCORD_TOKEN: ");
-            let test_guild_id = get_input("Enter your TEST_GUILD_ID: ");
+        writeln!(file, "DISCORD_TOKEN={}", discord_token).unwrap();
+        writeln!(file, "TEST_GUILD_ID={}", test_guild_id).unwrap();
 
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(".env")
-                .unwrap();
-
-            writeln!(file, "DISCORD_TOKEN={}", discord_token).unwrap();
-            writeln!(file, "TEST_GUILD_ID={}", test_guild_id).unwrap();
-
-            println!("'{}' created!", path);
-        }
+        println!("'{}' created!", path);
     }
 
     println!("✅ Finished building files!");

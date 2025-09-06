@@ -1,34 +1,34 @@
 use serenity::prelude::*;
 use serenity::model::application::*;
 use serenity::builder::*;
-
-use crate::data::{BotData, load_guild_data, save_guild_data};
-use crate::utils::check_admin;
+use std::time::Instant;
+use crate::{data::BotData, utils::internal_err};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("ping")
-        .description("Replies with Pong! (Admins only test)")
+        .description("Shows basic stats")
 }
 
 pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotData) {
-    if !check_admin(&ctx, &command).await { return; }
+    let start = Instant::now();
 
-    if let Some(guild_id) = command.guild_id {
-        let guild_id_u64 = guild_id.get();
+    // calculate latency
+    let latency_ms = start.elapsed().as_millis();
 
-        /*---( Access & Modify data here)---*/
+    // basic info
+    let servers_count = bot_data.guilds.lock().await.len();
+    let uptime = humantime::format_duration(chrono::Utc::now().signed_duration_since(bot_data.start_time).to_std().unwrap_or_default()).to_string();
 
-        let mut guild_data = load_guild_data(guild_id_u64);
-        {
-            let mut guilds = bot_data.guilds.lock().await;
-            guilds.insert(guild_id_u64, guild_data.clone());
-        }
-        save_guild_data(guild_id_u64, &guild_data);
-    }
+    let reply = format!(
+        "🏓 Pong!\nLatency: `{}ms`\nServers: `{}`\nUptime: `{}`",
+        latency_ms, servers_count, uptime
+    );
 
-    let _ = command.create_response(&ctx.http, CreateInteractionResponse::Message(
+    if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
-            .content("🏓 Pong!")
+            .content(reply)
             .flags(InteractionResponseFlags::EPHEMERAL)
-    )).await;
+    )).await {
+        internal_err(&ctx, &command, &e.to_string()).await;
+    }
 }

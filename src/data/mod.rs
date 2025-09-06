@@ -1,5 +1,6 @@
 pub mod structs;
 
+use chrono::{DateTime, Utc};
 use serenity::prelude::TypeMapKey;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -7,16 +8,10 @@ use tokio::sync::Mutex;
 use structs::*;
 use serde_json;
 
+#[derive(Default)]
 pub struct BotData {
     pub guilds: Arc<Mutex<HashMap<u64, GuildData>>>,
-}
-
-impl Default for BotData {
-    fn default() -> Self {
-        Self {
-            guilds: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
+    pub(crate) start_time: DateTime<Utc>,
 }
 
 pub struct BotDataKey;

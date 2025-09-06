@@ -1,0 +1,26 @@
+{
+  "YEAR": {
+    "en": "Year",
+    "jp": "年"
+  },
+  "MONTH": {
+    "en": "Month",
+    "jp": "月"
+  },
+  "DATE": {
+    "en": "Date",
+    "jp": "日にち"
+  },
+
+  "SUM": {
+    "en": "Sum",
+    "jp": "合計"
+  },
+  "5 MINUTES CHANGE": {
+    "en": "5 mins update",
+    "jp": "5分毎に自動更新"
+  },
+  "COUNT LOG": {
+    "en": "Count Log"
+  }
+}
