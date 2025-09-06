@@ -1,5 +1,6 @@
 pub mod ready;
 
+use serenity::all::ActivityData;
 use serenity::async_trait;
 use serenity::prelude::*;
 use serenity::model::prelude::Interaction;
@@ -20,10 +21,14 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: serenity::prelude::Context, ready: serenity::model::gateway::Ready) {
         self::ready::on_ready(&ctx, &ready).await;
 
+        ctx.set_activity(Some(ActivityData::playing("In Counting Channel With You! 💙")));
+
         let commands = serenity::model::application::Command::set_global_commands(
             &ctx.http,
             vec![ /*---register every commands here---*/
                 crate::commands::ping::register(),
+                crate::commands::help::register(),
+                crate::commands::setup::register(),
             ],
         ).await;
 

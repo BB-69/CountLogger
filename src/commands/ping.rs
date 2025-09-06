@@ -15,10 +15,10 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
 
     if let Some(guild_id) = command.guild_id {
         let guild_id_u64 = guild_id.get();
+        let mut guild_data = load_guild_data(guild_id_u64);
 
         /*---( Access & Modify data here)---*/
 
-        let mut guild_data = load_guild_data(guild_id_u64);
         {
             let mut guilds = bot_data.guilds.lock().await;
             guilds.insert(guild_id_u64, guild_data.clone());
