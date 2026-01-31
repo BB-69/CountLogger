@@ -1,10 +1,10 @@
+use crate::data::{BotData, BotDataKey, load_all_data};
+use crate::handlers;
 use chrono::Utc;
 use serenity::Client;
 use serenity::all::GatewayIntents;
-use tokio::sync::Mutex;
-use crate::handlers;
-use crate::data::{BotData, BotDataKey, load_all_data};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub async fn run(token: String) {
     let all_data = load_all_data();
@@ -17,9 +17,7 @@ pub async fn run(token: String) {
     let handler = handlers::Handler::new(bot_data.clone());
 
     let intents =
-        GatewayIntents::GUILDS |
-        GatewayIntents::GUILD_MESSAGES |
-        GatewayIntents::MESSAGE_CONTENT;
+        GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = Client::builder(&token, intents)
         .event_handler(handler)

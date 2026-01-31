@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-use serenity::all::*;
 use crate::data::BotData;
+use serenity::all::*;
 
-pub mod ping;
 pub mod help;
-pub mod setup;
+pub mod ping;
 pub mod relog;
+pub mod setup;
 
 macro_rules! command_map {
     ( $( $name:literal => $module:ident ),* $(,)? ) => {{
@@ -48,9 +47,13 @@ pub async fn handle(ctx: Context, command: CommandInteraction, bot_data: &BotDat
     if let Some(handler) = commands.get(command.data.name.as_str()) {
         handler(ctx, command, bot_data).await;
     } else {
-        let _ = command.create_response(&ctx.http, CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content("❓ Unknown command")
-        )).await;
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().content("❓ Unknown command"),
+                ),
+            )
+            .await;
     }
 }

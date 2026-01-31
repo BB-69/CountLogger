@@ -1,12 +1,11 @@
-use serenity::prelude::*;
-use serenity::model::application::*;
-use serenity::builder::*;
 use crate::data::BotData;
 use crate::utils::internal_err;
+use serenity::builder::*;
+use serenity::model::application::*;
+use serenity::prelude::*;
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("help")
-        .description("Full guide about this bot")
+    CreateCommand::new("help").description("Full guide about this bot")
 }
 
 pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotData) {

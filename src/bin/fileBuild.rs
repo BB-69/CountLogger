@@ -1,9 +1,10 @@
 use std::fs::{self, OpenOptions};
-use std::path::Path;
 use std::io::{self, Write};
+use std::path::Path;
 
 fn main() {
-    println!("Creating 'data.json' ..."); {
+    println!("Creating 'data.json' ...");
+    {
         let path = "src/data/data.json";
         let path_obj = Path::new(path);
 
@@ -19,7 +20,8 @@ fn main() {
         }
     }
 
-    println!("Creating '.env' ..."); {
+    println!("Creating '.env' ...");
+    {
         let path = ".env";
 
         let discord_token = get_input("Enter your DISCORD_TOKEN: ");

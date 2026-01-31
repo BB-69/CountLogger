@@ -1,12 +1,12 @@
 pub mod structs;
 
 use chrono::{DateTime, Utc};
+use serde_json;
 use serenity::prelude::TypeMapKey;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use structs::*;
-use serde_json;
+use tokio::sync::Mutex;
 
 #[derive(Default)]
 pub struct BotData {

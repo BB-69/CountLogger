@@ -2,9 +2,9 @@ use dotenv::dotenv;
 use std::env;
 
 mod bot;
-mod handlers;
 mod commands;
 mod data;
+mod handlers;
 mod utils;
 
 #[tokio::main]

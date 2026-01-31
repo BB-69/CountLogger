@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GuildSettings {
@@ -8,11 +8,13 @@ pub struct GuildSettings {
     pub lang2: Option<String>,
 }
 impl Default for GuildSettings {
-    fn default() -> Self { Self {
+    fn default() -> Self {
+        Self {
             utc: 0,
             lang: "en".to_string(),
             lang2: None,
-    }}
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -31,11 +33,13 @@ pub struct GuildData {
     pub daily_counts: BTreeMap<String, i64>,
 }
 
-impl GuildData { pub fn is_default_setup(&self) -> bool {
-    self.settings.utc == i8::default() &&
-    self.ids.log_channel_id == Option::default() &&
-    self.ids.counting_channel_id == Option::default()
-}}
+impl GuildData {
+    pub fn is_default_setup(&self) -> bool {
+        self.settings.utc == i8::default()
+            && self.ids.log_channel_id == Option::default()
+            && self.ids.counting_channel_id == Option::default()
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct AllGuildData(pub HashMap<u64, GuildData>);

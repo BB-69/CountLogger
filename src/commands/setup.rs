@@ -1,4 +1,4 @@
-use serenity::all::{ChannelId, ChannelType, Guild};
+use serenity::all::{ChannelId, ChannelType};
 use serenity::prelude::*;
 use serenity::model::application::*;
 use serenity::builder::*;
