@@ -6,17 +6,23 @@ use serenity::all::*;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use tokio::time::MissedTickBehavior;
-use tokio::time::interval;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::Mutex;
+use tokio::time::{Duration, Instant, MissedTickBehavior, interval, sleep};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("relog").description("Refresh and update all logs from the start")
 }
 
+static LOCK: once_cell::sync::Lazy<Arc<Mutex<()>>> =
+    once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(())));
+
 pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotData) {
     if !check_admin(&ctx, &command).await {
         return;
     }
+
+    let _guard = LOCK.lock().await;
 
     if let Some(guild_id) = command.guild_id {
         let guild_id_u64 = guild_id.get();
@@ -33,20 +39,7 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
             return;
         }
 
-        if let Err(e) = command
-            .create_response(
-                &ctx.http,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .content("🔄 Relog in progress... this might take a while!")
-                        .flags(InteractionResponseFlags::EPHEMERAL),
-                ),
-            )
-            .await
-        {
-            internal_err(&ctx, &command, &e.to_string()).await;
-            return;
-        }
+        let _ = command.defer(&ctx.http).await;
 
         if let (Some(count_ch_id), Some(log_ch_id)) = (
             guild_data.ids.counting_channel_id,
@@ -54,8 +47,21 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
         ) {
             guild_data.ids.last_scanned_msg_id = None;
 
+            let log_channel = ChannelId::new(log_ch_id);
+
+            let progress_msg = log_channel
+                .send_message(
+                    &ctx.http,
+                    CreateMessage::new()
+                        .content("🔄 Relog in progress... this might take a while!"),
+                )
+                .await
+                .unwrap_or_default();
+
             match get_lastmsg_day_map(
-                &ctx.http,
+                &ctx,
+                &progress_msg.id,
+                log_channel,
                 ChannelId::new(count_ch_id),
                 &guild_data.settings.utc,
             )
@@ -70,8 +76,6 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                     if let Some(new_last) = last_message_id {
                         guild_data.ids.last_scanned_msg_id = Some(new_last.get());
                     }
-
-                    let log_channel = ChannelId::new(log_ch_id);
 
                     let mut new_log_msg_map: BTreeMap<i32, BTreeMap<i64, u64>> = BTreeMap::new();
 
@@ -138,16 +142,20 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                 guilds.insert(guild_id_u64, guild_data.clone());
             }
             save_guild_data(guild_id_u64, &guild_data);
-        }
 
-        if let Err(e) = command
-            .edit_response(
-                &ctx.http,
-                EditInteractionResponse::new().content("✅ Relog Done!"),
-            )
-            .await
-        {
-            internal_err(&ctx, &command, &e.to_string()).await;
+            let _ = log_channel
+                .edit_message(
+                    &ctx.http,
+                    progress_msg.id,
+                    EditMessage::new().content(
+                        "✅ Relog Done!\n-# This message will delete automatically in 10 seconds",
+                    ),
+                )
+                .await;
+
+            sleep(Duration::from_secs(10)).await;
+
+            let _ = progress_msg.delete(&ctx.http).await;
         }
     } else {
         if let Err(e) = command
@@ -167,7 +175,11 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
 }
 
 pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
-    let mut interval = interval(Duration::minutes(5).to_std().unwrap());
+    if LOCK.try_lock().is_err() {
+        return;
+    }
+
+    let mut interval = interval(chrono::Duration::minutes(5).to_std().unwrap());
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     loop {
@@ -273,6 +285,7 @@ async fn fetch_new_daily_counts(
 ) -> serenity::Result<(BTreeMap<String, i64>, Option<MessageId>)> {
     let mut daily_counts: BTreeMap<String, i64> = BTreeMap::new();
     let mut last_seen: Option<MessageId> = None;
+    let mut last_num = 0i64;
 
     let mut get_message = GetMessages::new().limit(100);
     if let Some(last_id) = last_scanned {
@@ -298,10 +311,13 @@ async fn fetch_new_daily_counts(
                 {
                     let dt: DateTime<FixedOffset> = msg.timestamp.with_timezone(&offset);
                     let key = dt.date_naive().format("%Y-%m-%d").to_string();
-                    daily_counts
-                        .entry(key)
-                        .and_modify(|v| *v = (*v).max(num))
-                        .or_insert(num);
+                    if last_num == 0 || is_valid_num(last_num, num) {
+                        daily_counts
+                            .entry(key)
+                            .and_modify(|v| *v = (*v).max(num))
+                            .or_insert(num);
+                    }
+                    last_num = num;
                 }
             }
         }
@@ -321,19 +337,32 @@ async fn fetch_new_daily_counts(
 }
 
 async fn get_lastmsg_day_map(
-    http: &Http,
-    channel_id: ChannelId,
+    ctx: &Context,
+    progress_msg: &MessageId,
+    log_channel_id: ChannelId,
+    count_channel_id: ChannelId,
     utc: &i8,
 ) -> serenity::Result<(BTreeMap<String, i64>, Option<MessageId>)> {
     let mut daily_counts: BTreeMap<String, i64> = BTreeMap::new();
     let mut last_message_id: Option<MessageId> = None;
+    let mut last_num = 0i64;
+
+    let mut last_update = Instant::now();
+    let unix_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let start_timestamp = format!("<t:{}:R>", unix_time);
+
+    let mut total_count = 0i64;
+    let mut total_invalid_detected = 0i64;
 
     loop {
         let mut get_message = GetMessages::new().limit(100);
         if let Some(last_id) = last_message_id {
             get_message = get_message.before(last_id);
         }
-        let msgs = channel_id.messages(http, get_message).await?;
+        let msgs = count_channel_id.messages(&ctx.http, get_message).await?;
         if msgs.is_empty() {
             break;
         }
@@ -346,15 +375,52 @@ async fn get_lastmsg_day_map(
                 continue;
             }
             if let Ok(num) = msg.content.parse::<i64>() {
+                if total_count == 0 {
+                    total_count = num
+                };
                 if let Some(offset) =
                     FixedOffset::east_opt(utc.clone().clamp(-14, 12) as i32 * 3600)
                 {
+                    if last_update.elapsed() >= Duration::from_secs(10) {
+                        let unix_time = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let update_timestamp = format!("<t:{}:R>", unix_time);
+
+                        let _ = log_channel_id
+                            .edit_message(
+                                &ctx.http,
+                                progress_msg,
+                                EditMessage::new().content(format!(
+                                    "🔄 Relog in progress...\n📊 Read Counts Left: `{}/{}`{}\n-# Started {}\n-# Last Update {}",
+                                    &num,
+                                    &total_count,
+                                    if total_invalid_detected > 0 {
+                                        format!("\nInvalid Counts Detected: `{}`", total_invalid_detected)
+                                    } else {
+                                        "".to_string()
+                                    },
+                                    start_timestamp,
+                                    update_timestamp
+                                )),
+                            )
+                            .await;
+
+                        last_update = Instant::now();
+                    }
+
                     let dt: DateTime<FixedOffset> = msg.timestamp.with_timezone(&offset);
                     let key = dt.date_naive().format("%Y-%m-%d").to_string();
-                    daily_counts
-                        .entry(key)
-                        .and_modify(|v| *v = (*v).max(num))
-                        .or_insert(num);
+                    if last_num != 0 && !is_valid_num(last_num, num) {
+                        total_invalid_detected += 1;
+                    } else {
+                        daily_counts
+                            .entry(key)
+                            .and_modify(|v| *v = (*v).max(num))
+                            .or_insert(num);
+                    }
+                    last_num = num;
                 }
             }
         }
@@ -432,4 +498,8 @@ fn generate_log_messages(
     }
 
     messages
+}
+
+fn is_valid_num(pre: i64, post: i64) -> bool {
+    pre + 1 == post
 }

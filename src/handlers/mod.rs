@@ -34,6 +34,7 @@ impl EventHandler for Handler {
                 crate::commands::help::register(),
                 crate::commands::setup::register(),
                 crate::commands::relog::register(),
+                crate::commands::message::register(),
             ],
         )
         .await;

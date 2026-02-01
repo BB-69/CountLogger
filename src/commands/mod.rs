@@ -2,6 +2,7 @@ use crate::data::BotData;
 use serenity::all::*;
 
 pub mod help;
+pub mod message;
 pub mod ping;
 pub mod relog;
 pub mod setup;
@@ -42,6 +43,7 @@ pub async fn handle(ctx: Context, command: CommandInteraction, bot_data: &BotDat
         "help" => help,
         "setup" => setup,
         "relog" => relog,
+        "message" => message,
     };
 
     if let Some(handler) = commands.get(command.data.name.as_str()) {
