@@ -78,6 +78,7 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                     }
 
                     let mut new_log_msg_map: BTreeMap<i32, BTreeMap<i64, u64>> = BTreeMap::new();
+                    let mut last_year_latest_count = 0i64;
 
                     for year in years {
                         let year_i: i32 = year.parse().unwrap_or(0);
@@ -87,8 +88,16 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                             .map(|(k, v)| (k.clone(), *v))
                             .collect();
 
-                        let new_log_msgs = generate_log_messages(&guild_data, year_counts);
+                        let new_log_msgs = generate_log_messages(
+                            &guild_data,
+                            year_counts.clone(),
+                            Some(last_year_latest_count),
+                        );
                         let mut year_map: BTreeMap<i64, u64> = BTreeMap::new();
+
+                        {
+                            last_year_latest_count = *year_counts.last_key_value().unwrap().1;
+                        }
 
                         for (part, new_log_msg) in new_log_msgs {
                             if let Some(old_id) = guild_data
@@ -226,7 +235,8 @@ pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
                                 .map(|(k, v)| (k.clone(), *v))
                                 .collect();
 
-                            let new_log_msgs = generate_log_messages(&guild_data, year_counts);
+                            let new_log_msgs =
+                                generate_log_messages(&guild_data, year_counts, None);
 
                             let mut year_map = guild_data
                                 .ids
@@ -439,6 +449,7 @@ async fn get_lastmsg_day_map(
 fn generate_log_messages(
     guild_data: &GuildData,
     counts: BTreeMap<String, i64>,
+    offset_count: Option<i64>,
 ) -> BTreeMap<i64, String> {
     let lang1 = guild_data.settings.lang.as_str();
     let lang2 = guild_data.settings.lang2.as_deref();
@@ -447,7 +458,10 @@ fn generate_log_messages(
     let mut messages: BTreeMap<i64, String> = BTreeMap::default();
     let mut msg_lines: Vec<String> = Vec::new();
     let mut line_count = 0usize;
-    let mut prev_count = 0i64;
+    let mut prev_count = match offset_count {
+        Some(count) => count,
+        None => 0i64,
+    };
     let mut part = 1i64;
 
     if counts.is_empty() {
