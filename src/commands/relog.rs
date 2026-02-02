@@ -477,7 +477,10 @@ fn generate_log_messages(
             msg_lines.push(format!("-# -{line_count}-"));
         }
 
-        if line_count >= 50 || last_date.as_ref().map(|s| s == &date).unwrap_or(false) {
+        /* anymore than 40 lines (safe limit)
+        will result in unmarked-down message
+        Don't ask me why discord is like this*/
+        if line_count >= 40 || last_date.as_ref().map(|s| s == &date).unwrap_or(false) {
             // "## **📊 `Year {}` Count Log:**\n`date : sum  (5 min update)`\n"
             let header = format!(
                 "## **📊 `{} {} ({})` {}**\n`{} (UTC {}) : {}  ({})`\n",
