@@ -5,7 +5,7 @@ use serenity::prelude::*;
 use std::time::Instant;
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("ping").description("Shows basic stats")
+    CreateCommand::new("ping").description("🏓Pong! Shows basic stats")
 }
 
 pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotData) {

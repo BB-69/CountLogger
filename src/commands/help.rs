@@ -20,7 +20,7 @@ Setup and let it run, then it will logs counting history automatically.
 ## **-COMMAND-**
 
 `/help` : Full guide about this bot
-`/ping` : Shows basic stats
+`/ping` : 🏓Pong! Shows basic stats
 
 ### **(Admin only)**
 `/setup info` : Show info of current setup
