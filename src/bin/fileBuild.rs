@@ -26,6 +26,7 @@ fn main() {
 
         let discord_token = get_input("Enter your DISCORD_TOKEN: ");
         let test_guild_id = get_input("Enter your TEST_GUILD_ID: ");
+        let bot_owner_id = get_input("Enter your BOT_OWNER_ID: ");
 
         let mut file = OpenOptions::new()
             .write(true)
@@ -36,6 +37,7 @@ fn main() {
 
         writeln!(file, "DISCORD_TOKEN={}", discord_token).unwrap();
         writeln!(file, "TEST_GUILD_ID={}", test_guild_id).unwrap();
+        writeln!(file, "BOT_OWNER_ID={}", bot_owner_id).unwrap();
 
         println!("'{}' created!", path);
     }
