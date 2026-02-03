@@ -280,6 +280,8 @@ async fn relog_start(
                     }
 
                     for (part, new_log_msg) in new_log_msgs {
+                        let embed = CreateEmbed::new().description(new_log_msg).color(0x00ffff);
+
                         if let Some(old_id) = guild_data
                             .ids
                             .log_msg_map
@@ -291,7 +293,7 @@ async fn relog_start(
                                     .edit_message(
                                         &ctx.http,
                                         *old_id,
-                                        EditMessage::new().content(new_log_msg),
+                                        EditMessage::new().embed(embed.clone()),
                                     )
                                     .await;
                                 year_map.insert(part, *old_id);
@@ -301,7 +303,7 @@ async fn relog_start(
 
                         // fallback: create new
                         if let Ok(new_msg) = log_channel
-                            .send_message(&ctx.http, CreateMessage::new().content(new_log_msg))
+                            .send_message(&ctx.http, CreateMessage::new().embed(embed.clone()))
                             .await
                         {
                             year_map.insert(part, new_msg.id.get());
@@ -429,16 +431,21 @@ pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
                                 .unwrap_or_default();
 
                             for (part, new_msg) in new_log_msgs.clone() {
+                                let embed = CreateEmbed::new().description(new_msg).color(0x00ffff);
+
                                 if let Some(&old_id) = year_map.get(&part) {
                                     let _ = log_channel
                                         .edit_message(
                                             &ctx.http,
                                             MessageId::new(old_id),
-                                            EditMessage::new().content(new_msg),
+                                            EditMessage::new().embed(embed.clone()),
                                         )
                                         .await;
                                 } else if let Ok(new_msg) = log_channel
-                                    .send_message(&ctx.http, CreateMessage::new().content(new_msg))
+                                    .send_message(
+                                        &ctx.http,
+                                        CreateMessage::new().embed(embed.clone()),
+                                    )
                                     .await
                                 {
                                     year_map.insert(part, new_msg.id.get());
@@ -692,7 +699,7 @@ fn generate_log_messages(
         /* anymore than 40 lines (safe limit)
         will result in unmarked-down message
         Don't ask me why discord is like this*/
-        if line_count >= 40 || is_last {
+        if line_count >= 50 || is_last {
             // "## **📊 `Year {}` Count Log:**\n`date : sum  (5 min update)`\n"
             let header = format!(
                 "## **📊 `{} {} ({})` {}**\n`{} (UTC {}) : {}  ({})`\n",
