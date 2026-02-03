@@ -6,6 +6,7 @@ pub struct GuildSettings {
     pub utc: i8,
     pub lang: String,
     pub lang2: Option<String>,
+    pub auto_relog: bool,
 }
 impl Default for GuildSettings {
     fn default() -> Self {
@@ -13,6 +14,7 @@ impl Default for GuildSettings {
             utc: 0,
             lang: "en".to_string(),
             lang2: None,
+            auto_relog: true,
         }
     }
 }

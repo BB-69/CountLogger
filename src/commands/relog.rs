@@ -140,6 +140,45 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                     }
                 }
 
+                "auto" => {
+                    if let CommandDataOptionValue::SubCommandGroup(group_options) = &top.value {
+                        if let Some(toggle) = group_options.iter().find(|o| o.name == "toggle") {
+                            if let CommandDataOptionValue::SubCommand(toggle_options) =
+                                &toggle.value
+                            {
+                                if toggle_options.is_empty() {
+                                    let mut auto_relog = guild_data.settings.auto_relog;
+                                    auto_relog = !auto_relog;
+                                    guild_data.settings.auto_relog = auto_relog;
+
+                                    if let Err(e) = command
+                                        .create_response(
+                                            &ctx.http,
+                                            CreateInteractionResponse::Message(
+                                                CreateInteractionResponseMessage::new()
+                                                    .content(format!(
+                                                        "✅ Toggled auto relog\n`{}` -> `{}`",
+                                                        !auto_relog, auto_relog
+                                                    ))
+                                                    .flags(InteractionResponseFlags::EPHEMERAL),
+                                            ),
+                                        )
+                                        .await
+                                    {
+                                        internal_err(&ctx, &command, &e.to_string()).await;
+                                    }
+
+                                    {
+                                        let mut guilds = bot_data.guilds.lock().await;
+                                        guilds.insert(guild_id_u64, guild_data.clone());
+                                    }
+                                    save_guild_data(guild_id_u64, &guild_data);
+                                }
+                            }
+                        }
+                    }
+                }
+
                 _ => {
                     if let Err(e) = command
                         .create_response(
@@ -284,6 +323,21 @@ async fn relog_start(
             }
             Err(e) => {
                 internal_err(&ctx, &command, &e.to_string()).await;
+
+                let _ = log_channel
+                    .edit_message(
+                        &ctx.http,
+                        progress_msg.id,
+                        EditMessage::new().content(
+                            "❗Relog Session Interrupted!\n-# This message will delete automatically in 10 seconds",
+                        ),
+                    )
+                    .await;
+
+                sleep(Duration::from_secs(10)).await;
+
+                let _ = progress_msg.delete(&ctx.http).await;
+
                 return Err(());
             }
         }
@@ -322,8 +376,8 @@ pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
         let guilds = bot_data.guilds.lock().await.clone();
         for (guild_id_u64, mut guild_data) in guilds {
             let state = get_relog_state(guild_id_u64).await;
-            if state.lock.try_lock().is_err() {
-                return;
+            if state.lock.try_lock().is_err() || !guild_data.settings.auto_relog {
+                continue;
             }
 
             if let Some(count_ch_id) = guild_data.ids.counting_channel_id {

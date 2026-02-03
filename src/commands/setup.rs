@@ -123,12 +123,13 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                         let utc_format = get_utc_format(&guild_data.settings.utc);
                         
                         let reply = format!(
-                            "`UTC {}`\n`lang`: {}\n`lang2`: {}\n`log_channel`: <#{}>\n`counting_channel`: <#{}>",
+                            "`UTC {}`\n`lang`: {}\n`lang2`: {}\n`log_channel`: <#{}>\n`counting_channel`: <#{}>\n`auto_relog`: {}",
                             utc_format,
                             guild_data.settings.lang,
-                            guild_data.settings.lang2.as_deref().unwrap_or("(none)"),
+                            guild_data.settings.lang2.as_deref().unwrap_or("❓"),
                             log_ch_id,
-                            count_ch_id
+                            count_ch_id,
+                            if guild_data.settings.auto_relog {"✅"} else {"❌"}
                         );
 
                         if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
