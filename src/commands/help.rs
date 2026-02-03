@@ -28,7 +28,9 @@ Setup and let it run, then it will logs counting history automatically.
 `/setup channels` `[log_channel]` `[counting_channel]` : Set each specified channel as current
 `/setup timezone` `[utc]` : Set timezone for logging clarity
 `/setup language` `[lang]` `[lang2: OPTIONAL]` : Set language for logging clarity
-`/relog` : Refresh and update all logs from the start
+`/relog start` : Refresh and update all logs from the start
+`/relog end` : Cancel on-going relog session
+`/relog auto toggle` : Toggle auto update logging activity
 `/message purge` `[total_messages: OPTIONAL]` : Delete all (or specified amount) of this bot's message from latest
 
 ## **-FORMAT-**
