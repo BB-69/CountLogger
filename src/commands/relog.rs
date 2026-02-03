@@ -2,27 +2,67 @@ use crate::data::structs::GuildData;
 use crate::data::{BotData, load_guild_data, save_guild_data};
 use crate::utils::*;
 use chrono::*;
+use once_cell::sync::Lazy;
 use serenity::all::*;
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant, MissedTickBehavior, interval, sleep};
+use tokio_util::sync::CancellationToken;
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("relog").description("Refresh and update all logs from the start")
+    CreateCommand::new("relog")
+        .description("Relog bundled commands")
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "start",
+            "Refresh and update all logs from the start",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "cancel",
+            "Cancel on-going relog session",
+        ))
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommandGroup,
+                "auto",
+                "Relog update automation",
+            )
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "toggle",
+                "Toggle auto update activity",
+            )),
+        )
 }
 
-static LOCK: once_cell::sync::Lazy<Arc<Mutex<()>>> =
-    once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(())));
+#[derive(Clone)]
+pub struct RelogState {
+    pub lock: Arc<Mutex<()>>,
+    pub cancel_token: CancellationToken,
+}
+
+static RELOG_STATES: Lazy<Mutex<HashMap<u64, RelogState>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+async fn get_relog_state(guild_id: u64) -> RelogState {
+    let mut map = RELOG_STATES.lock().await;
+
+    map.entry(guild_id)
+        .or_insert_with(|| RelogState {
+            lock: Arc::new(Mutex::new(())),
+            cancel_token: CancellationToken::new(),
+        })
+        .clone()
+}
 
 pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotData) {
     if !check_admin(&ctx, &command).await {
         return;
     }
-
-    let _guard = LOCK.lock().await;
 
     if let Some(guild_id) = command.guild_id {
         let guild_id_u64 = guild_id.get();
@@ -39,132 +79,83 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
             return;
         }
 
-        let _ = command.defer(&ctx.http).await;
-
-        if let (Some(count_ch_id), Some(log_ch_id)) = (
-            guild_data.ids.counting_channel_id,
-            guild_data.ids.log_channel_id,
-        ) {
-            guild_data.ids.last_scanned_msg_id = None;
-
-            let log_channel = ChannelId::new(log_ch_id);
-
-            let progress_msg = log_channel
-                .send_message(
-                    &ctx.http,
-                    CreateMessage::new()
-                        .content("🔄 Relog in progress... this might take a while!"),
-                )
-                .await
-                .unwrap_or_default();
-
-            match get_lastmsg_day_map(
-                &ctx,
-                &progress_msg.id,
-                log_channel,
-                ChannelId::new(count_ch_id),
-                &guild_data.settings.utc,
-            )
-            .await
-            {
-                Ok((daily_counts, last_message_id)) => {
-                    let years: BTreeSet<String> = daily_counts
-                        .keys()
-                        .map(|key| key.split('-').next().unwrap().to_string())
-                        .collect();
-
-                    if let Some(new_last) = last_message_id {
-                        guild_data.ids.last_scanned_msg_id = Some(new_last.get());
+        if let Some(top) = command.data.options.first() {
+            match top.name.as_str() {
+                "start" => {
+                    if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content("📝 Relog underway...\n-# If you do not see the follow up message, please make sure CountLogger has `Send Messages` permission.")
+                            .flags(InteractionResponseFlags::EPHEMERAL)
+                    )).await {
+                        internal_err(&ctx, &command, &e.to_string()).await;
                     }
 
-                    let mut new_log_msg_map: BTreeMap<i32, BTreeMap<i64, u64>> = BTreeMap::new();
-                    let mut last_year_latest_count = 0i64;
+                    let state = get_relog_state(guild_id_u64).await;
+                    let _guard = state.lock.lock().await;
+                    let token = state.cancel_token.clone();
 
-                    for year in years {
-                        let year_i: i32 = year.parse().unwrap_or(0);
-                        let year_counts: BTreeMap<String, i64> = daily_counts
-                            .iter()
-                            .filter(|(k, _)| k.starts_with(&year))
-                            .map(|(k, v)| (k.clone(), *v))
-                            .collect();
-
-                        let new_log_msgs = generate_log_messages(
-                            &guild_data,
-                            year_counts.clone(),
-                            Some(last_year_latest_count),
-                        );
-                        let mut year_map: BTreeMap<i64, u64> = BTreeMap::new();
-
-                        {
-                            last_year_latest_count = *year_counts.last_key_value().unwrap().1;
-                        }
-
-                        for (part, new_log_msg) in new_log_msgs {
-                            if let Some(old_id) = guild_data
-                                .ids
-                                .log_msg_map
-                                .get(&year_i)
-                                .and_then(|ym| ym.get(&part))
-                            {
-                                if log_channel.message(&ctx.http, *old_id).await.is_ok() {
-                                    let _ = log_channel
-                                        .edit_message(
-                                            &ctx.http,
-                                            *old_id,
-                                            EditMessage::new().content(new_log_msg),
-                                        )
-                                        .await;
-                                    year_map.insert(part, *old_id);
-                                    continue;
-                                }
-                            }
-
-                            // fallback: create new
-                            if let Ok(new_msg) = log_channel
-                                .send_message(&ctx.http, CreateMessage::new().content(new_log_msg))
-                                .await
-                            {
-                                year_map.insert(part, new_msg.id.get());
-                            }
-                        }
-
-                        new_log_msg_map.insert(year_i, year_map);
-                    }
-
-                    // update state
-                    guild_data.daily_counts = daily_counts;
-                    guild_data.ids.log_msg_map = new_log_msg_map;
-
-                    log_info(&format!(
-                        "🛠 Relog Done for Guild{} ({} entries)",
+                    let _ = relog_start(
+                        &ctx,
+                        &command,
+                        bot_data,
                         guild_id_u64,
-                        guild_data.daily_counts.len()
-                    ));
+                        &mut guild_data,
+                        token,
+                    )
+                    .await;
                 }
-                Err(e) => {
-                    internal_err(&ctx, &command, &e.to_string()).await;
+
+                "cancel" => {
+                    let state = get_relog_state(guild_id_u64).await;
+                    if state.lock.try_lock().is_ok() {
+                        if let Err(e) = command
+                            .create_response(
+                                &ctx.http,
+                                CreateInteractionResponse::Message(
+                                    CreateInteractionResponseMessage::new()
+                                        .content("❌ No on-going relog session active")
+                                        .flags(InteractionResponseFlags::EPHEMERAL),
+                                ),
+                            )
+                            .await
+                        {
+                            internal_err(&ctx, &command, &e.to_string()).await;
+                        }
+                        return;
+                    } else {
+                        state.cancel_token.cancel();
+                        if let Err(e) = command
+                            .create_response(
+                                &ctx.http,
+                                CreateInteractionResponse::Message(
+                                    CreateInteractionResponseMessage::new()
+                                        .content("✅ Cancelled on-going relog session")
+                                        .flags(InteractionResponseFlags::EPHEMERAL),
+                                ),
+                            )
+                            .await
+                        {
+                            internal_err(&ctx, &command, &e.to_string()).await;
+                        }
+                    }
+                }
+
+                _ => {
+                    if let Err(e) = command
+                        .create_response(
+                            &ctx.http,
+                            CreateInteractionResponse::Message(
+                                CreateInteractionResponseMessage::new()
+                                    .content("❓ Available options: `start`, `cancel`, `auto`")
+                                    .flags(InteractionResponseFlags::EPHEMERAL),
+                            ),
+                        )
+                        .await
+                    {
+                        internal_err(&ctx, &command, &e.to_string()).await;
+                    }
                 }
             }
-
-            {
-                let mut guilds = bot_data.guilds.lock().await;
-                guilds.insert(guild_id_u64, guild_data.clone());
-            }
-            save_guild_data(guild_id_u64, &guild_data);
-
-            let _ = log_channel
-                .edit_message(
-                    &ctx.http,
-                    progress_msg.id,
-                    EditMessage::new().content(
-                        "✅ Relog Done!\n-# This message will delete automatically in 10 seconds",
-                    ),
-                )
-                .await;
-
-            sleep(Duration::from_secs(10)).await;
-
-            let _ = progress_msg.delete(&ctx.http).await;
         }
     } else {
         if let Err(e) = command
@@ -183,11 +174,145 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
     }
 }
 
-pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
-    if LOCK.try_lock().is_err() {
-        return;
+async fn relog_start(
+    ctx: &Context,
+    command: &CommandInteraction,
+    bot_data: &BotData,
+    guild_id_u64: u64,
+    guild_data: &mut GuildData,
+    token: CancellationToken,
+) -> Result<(), ()> {
+    if let (Some(count_ch_id), Some(log_ch_id)) = (
+        guild_data.ids.counting_channel_id,
+        guild_data.ids.log_channel_id,
+    ) {
+        guild_data.ids.last_scanned_msg_id = None;
+
+        let log_channel = ChannelId::new(log_ch_id);
+
+        let progress_msg = log_channel
+            .send_message(
+                &ctx.http,
+                CreateMessage::new().content("🔄 Relog in progress... this might take a while!"),
+            )
+            .await
+            .unwrap_or_default();
+
+        match get_lastmsg_day_map(
+            &ctx,
+            &progress_msg.id,
+            log_channel,
+            ChannelId::new(count_ch_id),
+            &guild_data.settings.utc,
+            token,
+        )
+        .await
+        {
+            Ok((daily_counts, last_message_id)) => {
+                let years: BTreeSet<String> = daily_counts
+                    .keys()
+                    .map(|key| key.split('-').next().unwrap().to_string())
+                    .collect();
+
+                if let Some(new_last) = last_message_id {
+                    guild_data.ids.last_scanned_msg_id = Some(new_last.get());
+                }
+
+                let mut new_log_msg_map: BTreeMap<i32, BTreeMap<i64, u64>> = BTreeMap::new();
+                let mut last_year_latest_count = 0i64;
+
+                for year in years {
+                    let year_i: i32 = year.parse().unwrap_or(0);
+                    let year_counts: BTreeMap<String, i64> = daily_counts
+                        .iter()
+                        .filter(|(k, _)| k.starts_with(&year))
+                        .map(|(k, v)| (k.clone(), *v))
+                        .collect();
+
+                    let new_log_msgs = generate_log_messages(
+                        &guild_data,
+                        year_counts.clone(),
+                        Some(last_year_latest_count),
+                    );
+                    let mut year_map: BTreeMap<i64, u64> = BTreeMap::new();
+
+                    {
+                        last_year_latest_count = *year_counts.last_key_value().unwrap().1;
+                    }
+
+                    for (part, new_log_msg) in new_log_msgs {
+                        if let Some(old_id) = guild_data
+                            .ids
+                            .log_msg_map
+                            .get(&year_i)
+                            .and_then(|ym| ym.get(&part))
+                        {
+                            if log_channel.message(&ctx.http, *old_id).await.is_ok() {
+                                let _ = log_channel
+                                    .edit_message(
+                                        &ctx.http,
+                                        *old_id,
+                                        EditMessage::new().content(new_log_msg),
+                                    )
+                                    .await;
+                                year_map.insert(part, *old_id);
+                                continue;
+                            }
+                        }
+
+                        // fallback: create new
+                        if let Ok(new_msg) = log_channel
+                            .send_message(&ctx.http, CreateMessage::new().content(new_log_msg))
+                            .await
+                        {
+                            year_map.insert(part, new_msg.id.get());
+                        }
+                    }
+
+                    new_log_msg_map.insert(year_i, year_map);
+                }
+
+                // update state
+                guild_data.daily_counts = daily_counts;
+                guild_data.ids.log_msg_map = new_log_msg_map;
+
+                log_info(&format!(
+                    "🛠 Relog Done for Guild{} ({} entries)",
+                    guild_id_u64,
+                    guild_data.daily_counts.len()
+                ));
+            }
+            Err(e) => {
+                internal_err(&ctx, &command, &e.to_string()).await;
+                return Err(());
+            }
+        }
+
+        {
+            let mut guilds = bot_data.guilds.lock().await;
+            guilds.insert(guild_id_u64, guild_data.clone());
+        }
+        save_guild_data(guild_id_u64, &guild_data);
+
+        let _ = log_channel
+            .edit_message(
+                &ctx.http,
+                progress_msg.id,
+                EditMessage::new().content(
+                    "✅ Relog Done!\n-# This message will delete automatically in 10 seconds",
+                ),
+            )
+            .await;
+
+        sleep(Duration::from_secs(10)).await;
+
+        let _ = progress_msg.delete(&ctx.http).await;
     }
 
+    Ok(())
+}
+
+pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
     let mut interval = interval(chrono::Duration::minutes(5).to_std().unwrap());
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -196,6 +321,11 @@ pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
 
         let guilds = bot_data.guilds.lock().await.clone();
         for (guild_id_u64, mut guild_data) in guilds {
+            let state = get_relog_state(guild_id_u64).await;
+            if state.lock.try_lock().is_err() {
+                return;
+            }
+
             if let Some(count_ch_id) = guild_data.ids.counting_channel_id {
                 if let Some(log_ch_id) = guild_data.ids.log_channel_id {
                     let count_channel = ChannelId::new(count_ch_id);
@@ -299,7 +429,7 @@ async fn fetch_new_daily_counts(
 
     let mut get_message = GetMessages::new().limit(100);
     if let Some(last_id) = last_scanned {
-        get_message = get_message.after(last_id); // 👈 fetch only newer
+        get_message = get_message.after(last_id);
     }
 
     loop {
@@ -352,7 +482,11 @@ async fn get_lastmsg_day_map(
     log_channel_id: ChannelId,
     count_channel_id: ChannelId,
     utc: &i8,
-) -> serenity::Result<(BTreeMap<String, i64>, Option<MessageId>)> {
+    token: CancellationToken,
+) -> serenity::Result<
+    (BTreeMap<String, i64>, Option<MessageId>),
+    Box<dyn std::error::Error + Send + Sync>,
+> {
     let mut daily_counts: BTreeMap<String, i64> = BTreeMap::new();
     let mut last_message_id: Option<MessageId> = None;
     let mut last_num = 0i64;
@@ -381,6 +515,10 @@ async fn get_lastmsg_day_map(
         page_msgs.reverse();
 
         for msg in &page_msgs {
+            if token.is_cancelled() {
+                return Err("CancelledToken".into());
+            }
+
             if msg.author.bot {
                 continue;
             }
