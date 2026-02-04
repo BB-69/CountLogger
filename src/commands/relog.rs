@@ -312,7 +312,10 @@ async fn relog_start(
                             .copied()
                             .collect();
                         for id in map {
-                            if let Err(e) = log_channel.delete_message(&ctx.http, id).await {
+                            if let Err(e) = log_channel
+                                .delete_message(&ctx.http, MessageId::new(id))
+                                .await
+                            {
                                 internal_err(&ctx, &command, &e.to_string()).await;
                             }
                         }
