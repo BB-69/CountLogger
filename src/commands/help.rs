@@ -32,7 +32,7 @@ Setup and let it run, then it will logs counting history automatically.
 `/relog formatonly`: Refresh and update only format for logs
 `/relog end` : Cancel on-going relog session
 `/relog auto toggle` : Toggle auto update logging activity
-`/message purge` `[total_messages: OPTIONAL]` : Delete all (or specified amount) of this bot's message from latest
+`/message purge` `[total_messages: OPTIONAL]` `[include_users: OPTIONAL]` : Delete all (or specified amount) of this bot's (or also other users) message from log_channel
 
 ## **-FORMAT-**
 

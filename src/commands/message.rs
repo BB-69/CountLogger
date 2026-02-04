@@ -11,7 +11,7 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
                 "purge",
-                "Purge all messages from CountLogger in this channel",
+                "Purge all messages from CountLogger in log_channel",
             )
             .add_sub_option(
                 CreateCommandOption::new(
@@ -20,6 +20,14 @@ pub fn register() -> CreateCommand {
                     "Customize number of messages to purge",
                 )
                 .max_int_value(500)
+                .required(false),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::Boolean,
+                    "include_users",
+                    "Also purge other user messages",
+                )
                 .required(false),
             ),
         )
@@ -57,6 +65,10 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                                 .iter()
                                 .find(|o| o.name == "total_messages")
                                 .and_then(|o| o.value.as_i64());
+                            let include_users = sub_options
+                                .iter()
+                                .find(|o| o.name == "include_users")
+                                .and_then(|o| o.value.as_bool());
 
                             if let Some(total) = total_messages {
                                 if let Err(e) = delete_bot_messages(
@@ -64,6 +76,7 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                                     &progress_msg.id,
                                     log_channel,
                                     Some(total),
+                                    include_users,
                                 )
                                 .await
                                 {
@@ -71,9 +84,14 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                                 }
                                 return;
                             } else {
-                                if let Err(e) =
-                                    delete_bot_messages(&ctx, &progress_msg.id, log_channel, None)
-                                        .await
+                                if let Err(e) = delete_bot_messages(
+                                    &ctx,
+                                    &progress_msg.id,
+                                    log_channel,
+                                    None,
+                                    include_users,
+                                )
+                                .await
                                 {
                                     internal_err(&ctx, &command, &e.to_string()).await;
                                 }
@@ -133,6 +151,7 @@ async fn delete_bot_messages(
     progress_msg: &MessageId,
     channel_id: ChannelId,
     max_delete: Option<i64>,
+    include_users: Option<bool>,
 ) -> serenity::Result<()> {
     let progress_msg_id = progress_msg.get();
 
@@ -168,7 +187,9 @@ async fn delete_bot_messages(
                 }
             }
 
-            if msg.author.id == ctx.http.get_current_user().await?.id {
+            if include_users.unwrap_or(false)
+                || msg.author.id == ctx.http.get_current_user().await?.id
+            {
                 if msg.delete(&ctx.http).await.is_ok() {
                     if last_update.elapsed() >= Duration::from_secs(5) {
                         let _ = channel_id
