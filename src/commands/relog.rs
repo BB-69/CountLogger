@@ -614,7 +614,17 @@ async fn fetch_new_daily_counts(
 ) -> serenity::Result<(BTreeMap<String, i64>, Option<MessageId>)> {
     let mut daily_counts: BTreeMap<String, i64> = BTreeMap::new();
     let mut last_seen: Option<MessageId> = None;
-    let mut last_num = 0i64;
+    let mut last_num = {
+        let mut n = 0i64;
+        if let Some(last_id) = last_scanned.clone() {
+            if let Ok(msg) = channel_id.message(http, last_id).await {
+                if let Ok(num) = msg.content.parse::<i64>() {
+                    n = num;
+                }
+            }
+        }
+        n
+    };
 
     let mut get_message = GetMessages::new().limit(100);
     if let Some(last_id) = last_scanned {
