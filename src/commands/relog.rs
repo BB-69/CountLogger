@@ -259,6 +259,7 @@ async fn relog_start(
         } else {
             get_lastmsg_day_map(
                 &ctx,
+                command,
                 &progress_msg.id,
                 log_channel,
                 ChannelId::new(count_ch_id),
@@ -301,27 +302,43 @@ async fn relog_start(
                         last_year_latest_count = *year_counts.last_key_value().unwrap().1;
                     }
 
+                    {
+                        let map: BTreeSet<u64> = guild_data
+                            .ids
+                            .log_msg_map
+                            .clone()
+                            .values()
+                            .flat_map(|inner| inner.values())
+                            .copied()
+                            .collect();
+                        for id in map {
+                            if let Err(e) = log_channel.delete_message(&ctx.http, id).await {
+                                internal_err(&ctx, &command, &e.to_string()).await;
+                            }
+                        }
+                    }
+
                     for (part, new_log_msg) in new_log_msgs {
                         let embed = CreateEmbed::new().description(new_log_msg).color(0x00ffff);
 
-                        if let Some(old_id) = guild_data
-                            .ids
-                            .log_msg_map
-                            .get(&year_i)
-                            .and_then(|ym| ym.get(&part))
-                        {
-                            if log_channel.message(&ctx.http, *old_id).await.is_ok() {
-                                let _ = log_channel
-                                    .edit_message(
-                                        &ctx.http,
-                                        *old_id,
-                                        EditMessage::new().embed(embed.clone()),
-                                    )
-                                    .await;
-                                year_map.insert(part, *old_id);
-                                continue;
-                            }
-                        }
+                        // if let Some(old_id) = guild_data
+                        //     .ids
+                        //     .log_msg_map
+                        //     .get(&year_i)
+                        //     .and_then(|ym| ym.get(&part))
+                        // {
+                        //     if log_channel.message(&ctx.http, *old_id).await.is_ok() {
+                        //         let _ = log_channel
+                        //             .edit_message(
+                        //                 &ctx.http,
+                        //                 *old_id,
+                        //                 EditMessage::new().embed(embed.clone()),
+                        //             )
+                        //             .await;
+                        //         year_map.insert(part, *old_id);
+                        //         continue;
+                        //     }
+                        // }
 
                         // fallback: create new
                         if let Ok(new_msg) = log_channel
@@ -335,21 +352,21 @@ async fn relog_start(
                     new_log_msg_map.insert(year_i, year_map);
                 }
 
-                let stray_log_msgs: BTreeSet<i32> = guild_data
-                    .ids
-                    .log_msg_map
-                    .clone()
-                    .iter()
-                    .filter(|(k, _)| !new_log_msg_map.contains_key(k))
-                    .map(|(k, _)| *k)
-                    .collect();
+                // let stray_log_msgs: BTreeSet<i32> = guild_data
+                //     .ids
+                //     .log_msg_map
+                //     .clone()
+                //     .iter()
+                //     .filter(|(k, _)| !new_log_msg_map.contains_key(k))
+                //     .map(|(k, _)| *k)
+                //     .collect();
 
-                for id in stray_log_msgs {
-                    let _ = log_channel.delete_message(
-                        &ctx.http,
-                        MessageId::new(u64::try_from(id).unwrap_or_default()),
-                    );
-                }
+                // for id in stray_log_msgs {
+                //     let _ = log_channel.delete_message(
+                //         &ctx.http,
+                //         MessageId::new(u64::try_from(id).unwrap_or_default()),
+                //     );
+                // }
 
                 if let Some(id) = guild_data.ids.log_helper_msg_id {
                     let _ = log_channel
@@ -641,6 +658,7 @@ async fn fetch_new_daily_counts(
 
 async fn get_lastmsg_day_map(
     ctx: &Context,
+    command: &CommandInteraction,
     progress_msg: &MessageId,
     log_channel_id: ChannelId,
     count_channel_id: ChannelId,
@@ -699,7 +717,7 @@ async fn get_lastmsg_day_map(
                             .as_secs();
                         let update_timestamp = format!("<t:{}:R>", unix_time);
 
-                        let _ = log_channel_id
+                        if let Err(e) = log_channel_id
                             .edit_message(
                                 &ctx.http,
                                 progress_msg,
@@ -716,7 +734,9 @@ async fn get_lastmsg_day_map(
                                     update_timestamp
                                 )),
                             )
-                            .await;
+                            .await {
+                                internal_err(&ctx, &command, &e.to_string()).await;
+                            }
 
                         last_update = Instant::now();
                     }
