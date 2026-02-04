@@ -1,4 +1,3 @@
-use dotenv::dotenv;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serenity::builder::*;
@@ -46,8 +45,7 @@ pub async fn check_admin(ctx: &Context, command: &CommandInteraction) -> bool {
         return true;
     }
 
-    if dotenv().is_ok() {
-        let owner_id = env::var("BOT_OWNER_ID").unwrap_or_default();
+    if let Ok(owner_id) = env::var("BOT_OWNER_ID") {
         if member.user.id.get().to_string() == owner_id {
             return true;
         };
