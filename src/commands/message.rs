@@ -108,6 +108,14 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                             sleep(Duration::from_secs(10)).await;
 
                             let _ = progress_msg.delete(&ctx.http).await;
+                        } else {
+                            if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
+                                CreateInteractionResponseMessage::new()
+                                    .content("❌ No `log_channel` detected\nPlease use `/setup channels` to setup necessary channels.")
+                                    .flags(InteractionResponseFlags::EPHEMERAL)
+                            )).await {
+                                internal_err(&ctx, &command, &e.to_string()).await;
+                            }
                         }
                     }
                 }
