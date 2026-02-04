@@ -22,5 +22,10 @@
   },
   "COUNT LOG": {
     "en": "Count Log"
+  },
+
+  "LOG_HELPER_MSG-0": {
+    "en": "If this channel is empty, go to **User Settings > Text & Images > Link Preview** (Turn it on!)",
+    "jp": "もしこのチャンネルが空なら  \n\n**設定 → （アプリの設定カテゴリー内）チャット → 埋め込みとリンクのプレビュー をONにする。**\n\nを行ってください。"
   }
 }

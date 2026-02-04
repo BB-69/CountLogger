@@ -18,7 +18,12 @@ pub fn register() -> CreateCommand {
         .add_option(CreateCommandOption::new(
             CommandOptionType::SubCommand,
             "start",
-            "Refresh and update all logs from the start",
+            "Fetch new and update all logs from the start",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "formatonly",
+            "Refresh and update only format for logs",
         ))
         .add_option(CreateCommandOption::new(
             CommandOptionType::SubCommand,
@@ -81,7 +86,9 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
 
         if let Some(top) = command.data.options.first() {
             match top.name.as_str() {
-                "start" => {
+                "start" | "formatonly" => {
+                    let formatonly = top.name == "formatonly";
+
                     if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
                             .content("📝 Relog underway...\n-# If you do not see the follow up message, please make sure CountLogger has `Send Messages` permission.")
@@ -101,6 +108,7 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
                         guild_id_u64,
                         &mut guild_data,
                         token,
+                        formatonly,
                     )
                     .await;
                 }
@@ -220,11 +228,13 @@ async fn relog_start(
     guild_id_u64: u64,
     guild_data: &mut GuildData,
     token: CancellationToken,
+    formatonly: bool,
 ) -> Result<(), ()> {
     if let (Some(count_ch_id), Some(log_ch_id)) = (
         guild_data.ids.counting_channel_id,
         guild_data.ids.log_channel_id,
     ) {
+        let last_msg_id = guild_data.ids.last_scanned_msg_id.clone();
         guild_data.ids.last_scanned_msg_id = None;
 
         let log_channel = ChannelId::new(log_ch_id);
@@ -237,16 +247,28 @@ async fn relog_start(
             .await
             .unwrap_or_default();
 
-        match get_lastmsg_day_map(
-            &ctx,
-            &progress_msg.id,
-            log_channel,
-            ChannelId::new(count_ch_id),
-            &guild_data.settings.utc,
-            token,
-        )
-        .await
-        {
+        let relog_result: Result<
+            (BTreeMap<_, _>, Option<MessageId>),
+            Box<dyn std::error::Error + Send + Sync>,
+        > = if formatonly {
+            if let Some(last) = last_msg_id {
+                Ok((guild_data.daily_counts.clone(), Some(MessageId::new(last))))
+            } else {
+                Err("No cached last message ID".into())
+            }
+        } else {
+            get_lastmsg_day_map(
+                &ctx,
+                &progress_msg.id,
+                log_channel,
+                ChannelId::new(count_ch_id),
+                &guild_data.settings.utc,
+                token,
+            )
+            .await
+        };
+
+        match relog_result {
             Ok((daily_counts, last_message_id)) => {
                 let years: BTreeSet<String> = daily_counts
                     .keys()
@@ -313,6 +335,47 @@ async fn relog_start(
                     new_log_msg_map.insert(year_i, year_map);
                 }
 
+                let stray_log_msgs: BTreeSet<i32> = guild_data
+                    .ids
+                    .log_msg_map
+                    .clone()
+                    .iter()
+                    .filter(|(k, _)| !new_log_msg_map.contains_key(k))
+                    .map(|(k, _)| *k)
+                    .collect();
+
+                for id in stray_log_msgs {
+                    let _ = log_channel.delete_message(
+                        &ctx.http,
+                        MessageId::new(u64::try_from(id).unwrap_or_default()),
+                    );
+                }
+
+                if let Some(id) = guild_data.ids.log_helper_msg_id {
+                    let _ = log_channel
+                        .delete_message(&ctx.http, MessageId::new(id))
+                        .await;
+                }
+                {
+                    let lang1 = guild_data.settings.lang.as_str();
+                    let lang2 = guild_data.settings.lang2.as_deref();
+
+                    if let Ok(msg) = log_channel
+                        .send_message(
+                            &ctx.http,
+                            CreateMessage::new().content(get_word(
+                                "log_helper_msg-0",
+                                lang1,
+                                lang2,
+                                CharaCase::Normal,
+                            )),
+                        )
+                        .await
+                    {
+                        guild_data.ids.log_helper_msg_id = Some(msg.id.get());
+                    }
+                }
+
                 // update state
                 guild_data.daily_counts = daily_counts;
                 guild_data.ids.log_msg_map = new_log_msg_map;
@@ -326,16 +389,26 @@ async fn relog_start(
             Err(e) => {
                 internal_err(&ctx, &command, &e.to_string()).await;
 
-                let _ = log_channel
-                    .edit_message(
+                if formatonly {
+                    let _ = log_channel
+                        .edit_message(
                         &ctx.http,
                         progress_msg.id,
                         EditMessage::new().content(
-                            "❗Relog Session Interrupted!\n-# This message will delete automatically in 10 seconds",
+                            "❌ Insufficient data. Please do normal relog to acquire new data in the process\n-# This message will delete automatically in 10 seconds",
                         ),
-                    )
-                    .await;
-
+                    ).await;
+                } else {
+                    let _ = log_channel
+                        .edit_message(
+                            &ctx.http,
+                            progress_msg.id,
+                            EditMessage::new().content(
+                                "❗ Relog Session Interrupted!\n-# This message will delete automatically in 10 seconds",
+                            ),
+                        )
+                        .await;
+                }
                 sleep(Duration::from_secs(10)).await;
 
                 let _ = progress_msg.delete(&ctx.http).await;
@@ -430,6 +503,8 @@ pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
                                 .remove(&year_now)
                                 .unwrap_or_default();
 
+                            let mut is_new_log_msg = false;
+
                             for (part, new_msg) in new_log_msgs.clone() {
                                 let embed = CreateEmbed::new().description(new_msg).color(0x00ffff);
 
@@ -448,7 +523,34 @@ pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
                                     )
                                     .await
                                 {
+                                    is_new_log_msg = true;
                                     year_map.insert(part, new_msg.id.get());
+                                }
+                            }
+
+                            if is_new_log_msg {
+                                if let Some(id) = guild_data.ids.log_helper_msg_id {
+                                    let _ =
+                                        log_channel.delete_message(&ctx.http, MessageId::new(id));
+                                }
+                                {
+                                    let lang1 = guild_data.settings.lang.as_str();
+                                    let lang2 = guild_data.settings.lang2.as_deref();
+
+                                    if let Ok(msg) = log_channel
+                                        .send_message(
+                                            &ctx.http,
+                                            CreateMessage::new().content(get_word(
+                                                "log_helper_msg-0",
+                                                lang1,
+                                                lang2,
+                                                CharaCase::Normal,
+                                            )),
+                                        )
+                                        .await
+                                    {
+                                        guild_data.ids.log_helper_msg_id = Some(msg.id.get());
+                                    }
                                 }
                             }
 
@@ -682,27 +784,27 @@ fn generate_log_messages(
         let increment = count - prev_count;
         prev_count = count;
 
-        let line = format!("`{m}-{d}` : **{count}** (+{increment})");
+        let line = format!("`{m}-{d}` {count} (+{increment})");
         msg_lines.push(line);
         line_count += 1;
 
-        if line_count % 5 == 0 {
+        if line_count % 10 == 0 {
             msg_lines.push(format!("-# -{line_count}-"));
         }
 
         let is_last = last_date.as_ref().map(|s| s == &date).unwrap_or(false);
 
-        if is_last && line_count % 5 != 0 {
+        if is_last && line_count % 10 != 0 {
             msg_lines.push(format!("-# -{line_count}-"));
         }
 
         /* anymore than 40 lines (safe limit)
         will result in unmarked-down message
         Don't ask me why discord is like this*/
-        if line_count >= 50 || is_last {
+        if line_count >= 100 || is_last {
             // "## **📊 `Year {}` Count Log:**\n`date : sum  (5 min update)`\n"
             let header = format!(
-                "## **📊 `{} {} ({})` {}**\n`{} (UTC {}) : {}  ({})`\n",
+                "## **📊 `{} {} ({})` {}**\n`{} (UTC {}) : {} ({})`\n",
                 get_word("Year", lang1, lang2, CharaCase::Normal),
                 y.to_string(),
                 part.to_string(),

@@ -25,6 +25,7 @@ pub struct IDs {
     pub counting_channel_id: Option<u64>,
     pub log_msg_map: BTreeMap<i32, BTreeMap<i64, u64>>, // year -> { part -> message_id }
     pub last_scanned_msg_id: Option<u64>,
+    pub log_helper_msg_id: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
