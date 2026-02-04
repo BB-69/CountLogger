@@ -831,7 +831,7 @@ fn generate_log_messages(
         will result in unmarked-down message (only if not an embed)
         Don't ask me why discord is like this*/
         if line_count >= 100 || is_last {
-            // "## **📊 Count Log\n`Year {}`**\n`date : sum (5 min update)`\n"
+            // "## 📊 Count Log\n## `Year {}`\n`date : sum (5 min update)`\n"
             let header = format!(
                 "## **📊 {}\n`{} {} ({})`**\n`{} (UTC {}) : {}`\n`({})`\n",
                 get_word("Count Log", lang1, None, CharaCase::Normal),
