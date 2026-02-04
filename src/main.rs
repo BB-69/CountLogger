@@ -1,9 +1,9 @@
 use axum::{Router, routing::get};
 use dotenv::dotenv;
-use std::env;
 use std::fs;
 use std::path::Path;
 use std::process::exit;
+use std::{env, time::Duration};
 use tokio::net::TcpListener;
 
 use crate::utils::log_error;
@@ -16,7 +16,9 @@ mod utils;
 
 #[tokio::main]
 async fn main() {
-    /* Create data.json */
+    println!("🚀 App booted at {:?}", std::time::SystemTime::now());
+
+    // ===== DATA JSON =====
 
     {
         let path = "src/data/data.json";
@@ -34,27 +36,64 @@ async fn main() {
                 log_error(&e.to_string());
                 exit(1);
             }
-            println!("'{}' created!", path);
+            println!("📄 '{}' created!", path);
         }
     }
 
-    /* Start Bot */
-
     dotenv().ok();
-    let token = env::var("DISCORD_TOKEN").expect("Missing token in .env");
 
-    tokio::spawn(async {
-        bot::run(token).await;
+    // ===== ENV CHECKS =====
+    let token = env::var("DISCORD_TOKEN").expect("❌ DISCORD_TOKEN missing from environment");
+
+    let port = env::var("PORT").unwrap_or_else(|_| {
+        println!("⚠️ PORT not set, defaulting to 3000");
+        "3000".to_string()
     });
 
-    /* For Web Service Hosting */
+    println!("🔑 Discord token loaded");
+    println!("🌐 Web server will bind to port {port}");
 
-    let app = Router::new().route("/", get(|| async { "📊 CountLogger Online" }));
+    // ===== BOT SUPERVISOR TASK =====
+    let bot_task = tokio::spawn(async move {
+        loop {
+            println!("🎧 Starting Discord bot…");
 
-    let port = std::env::var("PORT").unwrap_or("3000".to_string());
+            if let Err(e) = bot::run(token.clone()).await {
+                eprintln!("❌ Discord bot crashed: {e}");
+            } else {
+                eprintln!("⚠️ Discord bot exited without error (unexpected)");
+            }
+
+            println!("🔁 Restarting Discord bot in 5 seconds…");
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+    });
+
+    // ===== WEB SERVER =====
+    let app = Router::new()
+        .route("/", get(|| async { "📊 CountLogger Online 💙" }))
+        .route("/health", get(|| async { "ok" }));
 
     let addr = format!("0.0.0.0:{port}");
-    let listener = TcpListener::bind(&addr).await.unwrap();
+    let listener = TcpListener::bind(&addr)
+        .await
+        .expect("❌ Failed to bind TCP listener");
 
-    axum::serve(listener, app).await.unwrap();
+    println!("✅ Web server listening on http://{addr}");
+
+    let web_task = tokio::spawn(async move {
+        if let Err(e) = axum::serve(listener, app).await {
+            eprintln!("❌ Web server crashed: {e}");
+        }
+    });
+
+    // ===== SUPERVISOR =====
+    tokio::select! {
+        _ = bot_task => {
+            eprintln!("💀 Bot supervisor task ended (this should NEVER happen)");
+        }
+        _ = web_task => {
+            eprintln!("💀 Web server task ended");
+        }
+    }
 }
