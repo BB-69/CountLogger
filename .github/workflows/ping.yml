@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Ping Render app
         run: |
-          curl -L --fail https://CountLogger.onrender.com/ || exit 0
+          curl -L --fail https://countlogger.onrender.com/ || exit 0
