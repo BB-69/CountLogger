@@ -383,11 +383,17 @@ async fn relog_start(
                     if let Ok(msg) = log_channel
                         .send_message(
                             &ctx.http,
-                            CreateMessage::new().content(get_word(
-                                "log_helper_msg-0",
-                                lang1,
-                                lang2,
-                                CharaCase::Normal,
+                            CreateMessage::new().content(format!(
+                                "{}{}",
+                                get_word("log_helper_msg-0", lang1, None, CharaCase::Normal,),
+                                if let Some(l2) = lang2 {
+                                    format!(
+                                        "\n\n{}",
+                                        get_word("log_helper_msg-0", l2, None, CharaCase::Normal)
+                                    )
+                                } else {
+                                    "".to_string()
+                                }
                             )),
                         )
                         .await
@@ -822,12 +828,12 @@ fn generate_log_messages(
         }
 
         /* anymore than 40 lines (safe limit)
-        will result in unmarked-down message
+        will result in unmarked-down message (only if not an embed)
         Don't ask me why discord is like this*/
         if line_count >= 100 || is_last {
             // "## **📊 `Year {}` Count Log:**\n`date : sum  (5 min update)`\n"
             let header = format!(
-                "## **📊 `{} {} ({})` {}**\n`{} (UTC {}) : {} ({})`\n",
+                "## **📊 `{} {} ({})` {}**\n`{} (UTC {}) : {}`\n`({})`\n",
                 get_word("Year", lang1, lang2, CharaCase::Normal),
                 y.to_string(),
                 part.to_string(),
@@ -835,7 +841,7 @@ fn generate_log_messages(
                 get_word("Date", lang1, lang2, CharaCase::Normal),
                 get_utc_format(utc),
                 get_word("Sum", lang1, lang2, CharaCase::Normal),
-                get_word("5 minutes change", lang1, None, CharaCase::Normal),
+                get_word("5 minutes change", lang1, lang2, CharaCase::Normal),
             );
             messages.insert(part, format!("{}{}", header, msg_lines.join("\n")));
             msg_lines.clear();
