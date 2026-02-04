@@ -833,7 +833,7 @@ fn generate_log_messages(
         if line_count >= 100 || is_last {
             // "## 📊 Count Log\n## `Year {}`\n`date : sum (5 min update)`\n"
             let header = format!(
-                "## **📊 {}\n`{} {} ({})`**\n`{} (UTC {}) : {}`\n`({})`\n",
+                "## 📊 {}\n## `{} {} ({})`\n`{} (UTC {}) : {}`\n`({})`\n",
                 get_word("Count Log", lang1, None, CharaCase::Normal),
                 get_word("Year", lang1, lang2, CharaCase::Normal),
                 y.to_string(),
