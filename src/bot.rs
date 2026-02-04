@@ -6,7 +6,7 @@ use serenity::all::GatewayIntents;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub async fn run(token: String) {
+pub async fn run(token: String) -> Result<(), Box<dyn std::error::Error>> {
     let all_data = load_all_data();
     let guilds_map = Arc::new(Mutex::new(all_data.0));
     let bot_start = Utc::now();
@@ -29,7 +29,6 @@ pub async fn run(token: String) {
         crate::utils::log_info("Bot startup complete!");
     }
 
-    if let Err(e) = client.start().await {
-        crate::utils::log_error(&format!("Client error: {:?}", e));
-    }
+    client.start().await?;
+    Ok(())
 }
