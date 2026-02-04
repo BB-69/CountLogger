@@ -19,7 +19,11 @@ pub fn log_error(msg: &str) {
 }
 
 pub async fn internal_err(ctx: &Context, command: &CommandInteraction, err: &str) {
-    let msg = format!("INTERNAL_ERROR: `{}`", err);
+    let msg = format!(
+        "INTERNAL_ERROR GUILD{}: `{}`",
+        command.guild_id.unwrap_or_default(),
+        err
+    );
 
     let _ = command
         .create_response(
