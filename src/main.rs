@@ -56,17 +56,35 @@ async fn main() {
 
     let database_url = std::env::var("DATABASE_URL").expect("❌ DATABASE_URL not set");
 
-    // ===== DISCORD BOT =====
-    tokio::spawn(async move {
-        if let Err(e) = bot::run(token).await {
-            eprintln!("💀 Bot task exited unexpectedly: {e}");
-        }
-    });
+    let (tx, rx) = tokio::sync::oneshot::channel();
 
     // ===== DATABASE =====
     tokio::spawn(async move {
-        if let Err(e) = sqlx::PgPool::connect(&database_url).await {
-            eprintln!("❌ Database disconnected: {e}");
+        match sqlx::PgPool::connect(&database_url).await {
+            Err(e) => eprintln!("❌ Couldn't connect to Database: {e}"),
+            Ok(pool) => {
+                let row: (i64,) = sqlx::query_as("select 1::bigint")
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+
+                println!("✅ DB OK: {:?}", row);
+
+                sqlx::query("select * from public.guilds limit 1")
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+
+                tx.send(pool).unwrap();
+            }
+        }
+    });
+
+    // ===== DISCORD BOT =====
+    tokio::spawn(async move {
+        let pool = rx.await.unwrap();
+        if let Err(e) = bot::run(token, pool).await {
+            eprintln!("💀 Bot task exited unexpectedly: {e}");
         }
     });
 

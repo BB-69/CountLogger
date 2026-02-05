@@ -44,10 +44,8 @@ impl EventHandler for Handler {
         }
 
         // Others
-        tokio::spawn(crate::commands::relog::log_daily_counts(
-            ctx,
-            self.bot_data.clone(),
-        ));
+        let bot_data = std::sync::Arc::clone(&self.bot_data);
+        tokio::spawn(crate::commands::relog::log_daily_counts(ctx, bot_data));
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -64,27 +62,25 @@ impl EventHandler for Handler {
         if let Some(guild_id) = msg.guild_id {
             let mut modified = false;
             let guild_id_u64 = guild_id.get();
-            let mut guild_data = load_guild_data(guild_id_u64);
-
-            if let Some(_count_ch_id) = guild_data.ids.counting_channel_id {
-                if msg.content.parse::<i64>().is_ok() {
-                    let key = get_current_time(guild_data.settings.utc);
-                    if let Ok(num) = msg.content.parse::<i64>() {
-                        guild_data.daily_counts.insert(key, num);
-                        modified = true;
+            match load_guild_data(&self.bot_data.pool, guild_id_u64).await {
+                Ok(mut guild_data) => {
+                    if let Some(_count_ch_id) = guild_data.ids.counting_channel_id {
+                        if msg.content.parse::<i64>().is_ok() {
+                            let key = get_current_time(guild_data.settings.utc);
+                            if let Ok(num) = msg.content.parse::<i64>() {
+                                guild_data.daily_counts.insert(key, num);
+                                modified = true;
+                            }
+                        }
                     }
-                }
-            }
 
-            if !modified {
-                return;
+                    if !modified {
+                        return;
+                    }
+                    let _ = save_guild_data(&self.bot_data.pool, guild_id_u64, &guild_data).await;
+                }
+                Err(e) => eprintln!("❌ Cannot load data from Guild{guild_id_u64}: {e}"),
             }
-            {
-                let bot_data = &self.bot_data.clone();
-                let mut guilds = bot_data.guilds.lock().await;
-                guilds.insert(guild_id_u64, guild_data.clone());
-            }
-            save_guild_data(guild_id_u64, &guild_data);
         }
     }
 }

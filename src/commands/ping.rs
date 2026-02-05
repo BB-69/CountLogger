@@ -1,3 +1,4 @@
+use crate::data::load_all_data;
 use crate::{data::BotData, utils::internal_err};
 use serenity::builder::*;
 use serenity::model::application::*;
@@ -15,7 +16,11 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
     let latency_ms = start.elapsed().as_millis();
 
     // basic info
-    let servers_count = bot_data.guilds.lock().await.len();
+    let servers_count = load_all_data(&bot_data.pool)
+        .await
+        .unwrap_or_default()
+        .0
+        .len();
     let uptime = humantime::format_duration(
         chrono::Utc::now()
             .signed_duration_since(bot_data.start_time)
