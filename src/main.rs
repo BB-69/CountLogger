@@ -21,25 +21,25 @@ async fn main() {
 
     // ===== DATA JSON =====
 
-    {
-        let path = "src/data/data.json";
-        let path_obj = Path::new(path);
+    // {
+    //     let path = "src/data/data.json";
+    //     let path_obj = Path::new(path);
 
-        if !path_obj.exists() {
-            if let Some(parent) = path_obj.parent() {
-                if let Err(e) = fs::create_dir_all(parent) {
-                    log_error(&e.to_string());
-                    exit(1);
-                }
-            }
+    //     if !path_obj.exists() {
+    //         if let Some(parent) = path_obj.parent() {
+    //             if let Err(e) = fs::create_dir_all(parent) {
+    //                 log_error(&e.to_string());
+    //                 exit(1);
+    //             }
+    //         }
 
-            if let Err(e) = fs::write(path, "{}") {
-                log_error(&e.to_string());
-                exit(1);
-            }
-            println!("📄 '{}' created!", path);
-        }
-    }
+    //         if let Err(e) = fs::write(path, "{}") {
+    //             log_error(&e.to_string());
+    //             exit(1);
+    //         }
+    //         println!("📄 '{}' created!", path);
+    //     }
+    // }
 
     dotenv().ok();
 
