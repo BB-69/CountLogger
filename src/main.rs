@@ -56,39 +56,34 @@ async fn main() {
 
     let database_url = std::env::var("DATABASE_URL").expect("❌ DATABASE_URL not set");
 
-    let (tx, rx) = tokio::sync::oneshot::channel();
-
     // ===== DATABASE =====
-    tokio::spawn(async move {
-        'outer: loop {
-            match sqlx::PgPool::connect(&database_url).await {
-                Err(e) => eprintln!("❌ Couldn't connect to Database: {e}"),
-                Ok(pool) => {
-                    let row: (i64,) = sqlx::query_as("select 1::bigint")
-                        .fetch_one(&pool)
-                        .await
-                        .unwrap();
-
-                    println!("✅ DB OK: {:?}", row);
-
-                    sqlx::query("select * from public.guilds limit 1")
-                        .execute(&pool)
-                        .await
-                        .unwrap();
-
-                    tx.send(pool).unwrap();
-                    break 'outer;
-                }
+    let pool = loop {
+        match sqlx::PgPool::connect(&database_url).await {
+            Err(e) => {
+                eprintln!("❌ Couldn't connect to Database: {e}");
+                println!("🔁 Trying Database again in 10 seconds…");
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             }
+            Ok(pool) => {
+                let row: (i64,) = sqlx::query_as("select 1::bigint")
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
 
-            println!("🔁 Trying Database again in 10 seconds…");
-            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                println!("✅ DB OK: {:?}", row);
+
+                sqlx::query("select * from public.guilds limit 1")
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+
+                break pool;
+            }
         }
-    });
+    };
 
     // ===== DISCORD BOT =====
     tokio::spawn(async move {
-        let pool = rx.await.unwrap();
         if let Err(e) = bot::run(token, pool).await {
             eprintln!("💀 Bot task exited unexpectedly: {e}");
         }
