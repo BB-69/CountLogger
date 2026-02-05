@@ -16,6 +16,7 @@ mod utils;
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     println!("🚀 App booted at {:?}", std::time::SystemTime::now());
 
     // ===== DATA JSON =====
