@@ -60,23 +60,29 @@ async fn main() {
 
     // ===== DATABASE =====
     tokio::spawn(async move {
-        match sqlx::PgPool::connect(&database_url).await {
-            Err(e) => eprintln!("❌ Couldn't connect to Database: {e}"),
-            Ok(pool) => {
-                let row: (i64,) = sqlx::query_as("select 1::bigint")
-                    .fetch_one(&pool)
-                    .await
-                    .unwrap();
+        'outer: loop {
+            match sqlx::PgPool::connect(&database_url).await {
+                Err(e) => eprintln!("❌ Couldn't connect to Database: {e}"),
+                Ok(pool) => {
+                    let row: (i64,) = sqlx::query_as("select 1::bigint")
+                        .fetch_one(&pool)
+                        .await
+                        .unwrap();
 
-                println!("✅ DB OK: {:?}", row);
+                    println!("✅ DB OK: {:?}", row);
 
-                sqlx::query("select * from public.guilds limit 1")
-                    .execute(&pool)
-                    .await
-                    .unwrap();
+                    sqlx::query("select * from public.guilds limit 1")
+                        .execute(&pool)
+                        .await
+                        .unwrap();
 
-                tx.send(pool).unwrap();
+                    tx.send(pool).unwrap();
+                    break 'outer;
+                }
             }
+
+            println!("🔁 Trying Database again in 10 seconds…");
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
     });
 
