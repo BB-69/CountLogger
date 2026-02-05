@@ -1,6 +1,6 @@
-use std::fs::{self, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::path::Path;
+// use std::path::Path;
 
 fn main() {
     // println!("Creating 'data.json' ...");
