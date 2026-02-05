@@ -54,10 +54,19 @@ async fn main() {
     println!("🔑 Discord token loaded");
     println!("🌐 Web server port: {port}");
 
+    let database_url = std::env::var("DATABASE_URL").expect("❌ DATABASE_URL not set");
+
     // ===== DISCORD BOT =====
     tokio::spawn(async move {
         if let Err(e) = bot::run(token).await {
             eprintln!("💀 Bot task exited unexpectedly: {e}");
+        }
+    });
+
+    // ===== DATABASE =====
+    tokio::spawn(async move {
+        if let Err(e) = sqlx::PgPool::connect(&database_url).await {
+            eprintln!("❌ Database disconnected: {e}");
         }
     });
 
