@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select\n            guild_id,\n            is_setup,\n            utc, lang, lang2, auto_relog,\n            log_channel_id, counting_channel_id, log_msg_map,\n            last_scanned_msg_id, log_helper_msg_id,\n            daily_counts\n        from public.guilds\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "guild_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_setup",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "utc",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "lang",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "lang2",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "auto_relog",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "log_channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "counting_channel_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "log_msg_map",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "last_scanned_msg_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "log_helper_msg_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "daily_counts",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "daa96070d9bce64bfd6b5a4c019e086696a62ce299b12f496e5fa31540909e4d"
+}
