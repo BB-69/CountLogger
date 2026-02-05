@@ -36,9 +36,13 @@ Setup and let it run, then it will logs counting history automatically.
 
 ## **-FORMAT-**
 
-**📊 Year `<year> (<iteration>)` Count Log**
-`Date : Sum (<update_interval>)`
-`<MM/DD> : <total_count> (+<count>)`
+```
+## 📊 Count Log
+## `Year <YYYY> (<part>)`
+`Date (<UTC>) : Sum`
+`(5 min update)`
+`<MM>-<DD>` <total_count> (+<count>)
+```
 
 ## **-RECOMMENDED-**
 
