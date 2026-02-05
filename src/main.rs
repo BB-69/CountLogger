@@ -1,9 +1,9 @@
 use axum::{Router, routing::get};
 use dotenv::dotenv;
+use std::env;
 use std::fs;
 use std::path::Path;
 use std::process::exit;
-use std::{env, time::Duration};
 use tokio::net::TcpListener;
 
 use crate::utils::log_error;
@@ -43,7 +43,7 @@ async fn main() {
     dotenv().ok();
 
     // ===== ENV CHECKS =====
-    let token = env::var("DISCORD_TOKEN").expect("❌ DISCORD_TOKEN missing from environment");
+    let token = env::var("DISCORD_TOKEN").expect("❌ DISCORD_TOKEN missing");
 
     let port = env::var("PORT").unwrap_or_else(|_| {
         println!("⚠️ PORT not set, defaulting to 3000");
@@ -51,25 +51,16 @@ async fn main() {
     });
 
     println!("🔑 Discord token loaded");
-    println!("🌐 Web server will bind to port {port}");
+    println!("🌐 Web server port: {port}");
 
-    // ===== BOT SUPERVISOR TASK =====
-    let bot_task = tokio::spawn(async move {
-        loop {
-            println!("🎧 Starting Discord bot…");
-
-            if let Err(e) = bot::run(token.clone()).await {
-                eprintln!("❌ Discord bot crashed: {e}");
-            } else {
-                eprintln!("⚠️ Discord bot exited without error (unexpected)");
-            }
-
-            println!("🔁 Restarting Discord bot in 5 seconds…");
-            tokio::time::sleep(Duration::from_secs(5)).await;
+    // ===== DISCORD BOT =====
+    tokio::spawn(async move {
+        if let Err(e) = bot::run(token).await {
+            eprintln!("💀 Bot task exited unexpectedly: {e}");
         }
     });
 
-    // ===== WEB SERVER =====
+    // ===== WEB SERVER (Render keep-alive) =====
     let app = Router::new()
         .route("/", get(|| async { "📊 CountLogger Online 💙" }))
         .route("/health", get(|| async { "ok" }));
@@ -81,19 +72,8 @@ async fn main() {
 
     println!("✅ Web server listening on http://{addr}");
 
-    let web_task = tokio::spawn(async move {
-        if let Err(e) = axum::serve(listener, app).await {
-            eprintln!("❌ Web server crashed: {e}");
-        }
-    });
-
-    // ===== SUPERVISOR =====
-    tokio::select! {
-        _ = bot_task => {
-            eprintln!("💀 Bot supervisor task ended (this should NEVER happen)");
-        }
-        _ = web_task => {
-            eprintln!("💀 Web server task ended");
-        }
-    }
+    // This should NEVER exit
+    axum::serve(listener, app)
+        .await
+        .expect("❌ Axum server crashed");
 }
