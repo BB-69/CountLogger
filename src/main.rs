@@ -1,12 +1,12 @@
 use axum::{Router, routing::get};
 use dotenv::dotenv;
 use std::env;
-use std::fs;
-use std::path::Path;
-use std::process::exit;
+// use std::fs;
+// use std::path::Path;
+// use std::process::exit;
 use tokio::net::TcpListener;
 
-use crate::utils::log_error;
+// use crate::utils::log_error;
 
 mod bot;
 mod commands;
