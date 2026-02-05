@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -46,3 +47,25 @@ impl GuildData {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct AllGuildData(pub HashMap<u64, GuildData>);
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GuildRow {
+    pub guild_id: i64,
+    pub is_setup: bool,
+
+    // settings
+    pub utc: i16,
+    pub lang: String,
+    pub lang2: Option<String>,
+    pub auto_relog: bool,
+
+    // ids
+    pub log_channel_id: Option<i64>,
+    pub counting_channel_id: Option<i64>,
+    pub log_msg_map: Value,
+    pub last_scanned_msg_id: Option<i64>,
+    pub log_helper_msg_id: Option<i64>,
+
+    // maps
+    pub daily_counts: Value,
+}

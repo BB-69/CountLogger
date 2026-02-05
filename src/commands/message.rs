@@ -40,100 +40,112 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
 
     if let Some(guild_id) = command.guild_id {
         let guild_id_u64 = guild_id.get();
-        let guild_data = load_guild_data(guild_id_u64);
+        match load_guild_data(&bot_data.pool, guild_id_u64).await {
+            Ok(guild_data) => {
+                if let Some(top) = command.data.options.first() {
+                    match top.name.as_str() {
+                        "purge" => {
+                            if let CommandDataOptionValue::SubCommand(sub_options) = &top.value {
+                                if let Some(log_ch_id) = guild_data.ids.log_channel_id {
+                                    let _ = command.defer(&ctx.http).await;
 
-        if let Some(top) = command.data.options.first() {
-            match top.name.as_str() {
-                "purge" => {
-                    if let CommandDataOptionValue::SubCommand(sub_options) = &top.value {
-                        if let Some(log_ch_id) = guild_data.ids.log_channel_id {
-                            let _ = command.defer(&ctx.http).await;
+                                    let log_channel = ChannelId::new(log_ch_id);
 
-                            let log_channel = ChannelId::new(log_ch_id);
+                                    let progress_msg = log_channel
+                                        .send_message(
+                                            &ctx.http,
+                                            CreateMessage::new().content(
+                                                "🔄 Deletion in progress... this might take a while!",
+                                            ),
+                                        )
+                                        .await
+                                        .unwrap_or_default();
 
-                            let progress_msg = log_channel
-                                .send_message(
+                                    let total_messages = sub_options
+                                        .iter()
+                                        .find(|o| o.name == "total_messages")
+                                        .and_then(|o| o.value.as_i64());
+                                    let include_users = sub_options
+                                        .iter()
+                                        .find(|o| o.name == "include_users")
+                                        .and_then(|o| o.value.as_bool());
+
+                                    if let Some(total) = total_messages {
+                                        if let Err(e) = delete_bot_messages(
+                                            &ctx,
+                                            &progress_msg.id,
+                                            log_channel,
+                                            Some(total),
+                                            include_users,
+                                        )
+                                        .await
+                                        {
+                                            internal_err(&ctx, &command, &e.to_string()).await;
+                                        }
+                                        return;
+                                    } else {
+                                        if let Err(e) = delete_bot_messages(
+                                            &ctx,
+                                            &progress_msg.id,
+                                            log_channel,
+                                            None,
+                                            include_users,
+                                        )
+                                        .await
+                                        {
+                                            internal_err(&ctx, &command, &e.to_string()).await;
+                                        }
+                                    }
+
+                                    let _ = log_channel
+                                        .edit_message(
+                                            &ctx.http,
+                                            progress_msg.id,
+                                            EditMessage::new().content("✅ Deletion Done!\n-# This message will delete automatically in 10 seconds"),
+                                        )
+                                        .await;
+
+                                    sleep(Duration::from_secs(10)).await;
+
+                                    let _ = progress_msg.delete(&ctx.http).await;
+                                } else {
+                                    if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
+                                        CreateInteractionResponseMessage::new()
+                                            .content("❌ No `log_channel` detected\nPlease use `/setup channels` to setup necessary channels.")
+                                            .flags(InteractionResponseFlags::EPHEMERAL)
+                                    )).await {
+                                        internal_err(&ctx, &command, &e.to_string()).await;
+                                    }
+                                }
+                            }
+                        }
+
+                        _ => {
+                            if let Err(e) = command
+                                .create_response(
                                     &ctx.http,
-                                    CreateMessage::new().content(
-                                        "🔄 Deletion in progress... this might take a while!",
+                                    CreateInteractionResponse::Message(
+                                        CreateInteractionResponseMessage::new()
+                                            .content("❓ Available options: `purge`")
+                                            .flags(InteractionResponseFlags::EPHEMERAL),
                                     ),
                                 )
                                 .await
-                                .unwrap_or_default();
-
-                            let total_messages = sub_options
-                                .iter()
-                                .find(|o| o.name == "total_messages")
-                                .and_then(|o| o.value.as_i64());
-                            let include_users = sub_options
-                                .iter()
-                                .find(|o| o.name == "include_users")
-                                .and_then(|o| o.value.as_bool());
-
-                            if let Some(total) = total_messages {
-                                if let Err(e) = delete_bot_messages(
-                                    &ctx,
-                                    &progress_msg.id,
-                                    log_channel,
-                                    Some(total),
-                                    include_users,
-                                )
-                                .await
-                                {
-                                    internal_err(&ctx, &command, &e.to_string()).await;
-                                }
-                                return;
-                            } else {
-                                if let Err(e) = delete_bot_messages(
-                                    &ctx,
-                                    &progress_msg.id,
-                                    log_channel,
-                                    None,
-                                    include_users,
-                                )
-                                .await
-                                {
-                                    internal_err(&ctx, &command, &e.to_string()).await;
-                                }
-                            }
-
-                            let _ = log_channel
-                                .edit_message(
-                                    &ctx.http,
-                                    progress_msg.id,
-                                    EditMessage::new().content("✅ Deletion Done!\n-# This message will delete automatically in 10 seconds"),
-                                )
-                                .await;
-
-                            sleep(Duration::from_secs(10)).await;
-
-                            let _ = progress_msg.delete(&ctx.http).await;
-                        } else {
-                            if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
-                                CreateInteractionResponseMessage::new()
-                                    .content("❌ No `log_channel` detected\nPlease use `/setup channels` to setup necessary channels.")
-                                    .flags(InteractionResponseFlags::EPHEMERAL)
-                            )).await {
+                            {
                                 internal_err(&ctx, &command, &e.to_string()).await;
                             }
                         }
                     }
                 }
-
-                _ => {
-                    if let Err(e) = command
-                        .create_response(
-                            &ctx.http,
-                            CreateInteractionResponse::Message(
-                                CreateInteractionResponseMessage::new()
-                                    .content("❓ Available options: `purge`")
-                                    .flags(InteractionResponseFlags::EPHEMERAL),
-                            ),
-                        )
-                        .await
-                    {
-                        internal_err(&ctx, &command, &e.to_string()).await;
-                    }
+            }
+            Err(e) => {
+                internal_err(&ctx, &command, &e.to_string()).await;
+                if let Err(e2) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❗ Failed to fetch from Database\nPlease report the problem to developer...")
+                        .flags(InteractionResponseFlags::EPHEMERAL)
+                )).await {
+                    internal_err(&ctx, &command, &e2.to_string()).await;
                 }
             }
         }

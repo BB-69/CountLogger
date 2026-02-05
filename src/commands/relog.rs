@@ -1,5 +1,5 @@
 use crate::data::structs::GuildData;
-use crate::data::{BotData, load_guild_data, save_guild_data};
+use crate::data::{BotData, load_all_data, load_guild_data, save_guild_data};
 use crate::utils::*;
 use chrono::*;
 use once_cell::sync::Lazy;
@@ -71,136 +71,155 @@ pub async fn execute(ctx: Context, command: CommandInteraction, bot_data: &BotDa
 
     if let Some(guild_id) = command.guild_id {
         let guild_id_u64 = guild_id.get();
-        let mut guild_data = load_guild_data(guild_id_u64);
-
-        if !guild_data.is_setup {
-            if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("❗ This server hasn't been setup yet!\nPlease use `/setup channels` to setup necessary channels.")
-                    .flags(InteractionResponseFlags::EPHEMERAL)
-            )).await {
-                internal_err(&ctx, &command, &e.to_string()).await;
-            }
-            return;
-        }
-
-        if let Some(top) = command.data.options.first() {
-            match top.name.as_str() {
-                "start" | "formatonly" => {
-                    let formatonly = top.name == "formatonly";
-
+        match load_guild_data(&bot_data.pool, guild_id_u64).await {
+            Ok(mut guild_data) => {
+                if !guild_data.is_setup {
                     if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
-                            .content("📝 Relog underway...\n-# If you do not see the follow up message, please make sure CountLogger has `Send Messages` permission.")
+                            .content("❗ This server hasn't been setup yet!\nPlease use `/setup channels` to setup necessary channels.")
                             .flags(InteractionResponseFlags::EPHEMERAL)
                     )).await {
                         internal_err(&ctx, &command, &e.to_string()).await;
                     }
-
-                    let state = get_relog_state(guild_id_u64).await;
-                    let _guard = state.lock.lock().await;
-                    let token = state.cancel_token.clone();
-
-                    let _ = relog_start(
-                        &ctx,
-                        &command,
-                        bot_data,
-                        guild_id_u64,
-                        &mut guild_data,
-                        token,
-                        formatonly,
-                    )
-                    .await;
+                    return;
                 }
 
-                "cancel" => {
-                    let state = get_relog_state(guild_id_u64).await;
-                    if state.lock.try_lock().is_ok() {
-                        if let Err(e) = command
-                            .create_response(
-                                &ctx.http,
-                                CreateInteractionResponse::Message(
-                                    CreateInteractionResponseMessage::new()
-                                        .content("❌ No on-going relog session active")
-                                        .flags(InteractionResponseFlags::EPHEMERAL),
-                                ),
+                if let Some(top) = command.data.options.first() {
+                    match top.name.as_str() {
+                        "start" | "formatonly" => {
+                            let formatonly = top.name == "formatonly";
+
+                            if let Err(e) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
+                                CreateInteractionResponseMessage::new()
+                                    .content("📝 Relog underway...\n-# If you do not see the follow up message, please make sure CountLogger has `Send Messages` permission.")
+                                    .flags(InteractionResponseFlags::EPHEMERAL)
+                            )).await {
+                                internal_err(&ctx, &command, &e.to_string()).await;
+                            }
+
+                            let state = get_relog_state(guild_id_u64).await;
+                            let _guard = state.lock.lock().await;
+                            let token = state.cancel_token.clone();
+
+                            let _ = relog_start(
+                                &ctx,
+                                &command,
+                                bot_data,
+                                guild_id_u64,
+                                &mut guild_data,
+                                token,
+                                formatonly,
                             )
-                            .await
-                        {
-                            internal_err(&ctx, &command, &e.to_string()).await;
+                            .await;
                         }
-                        return;
-                    } else {
-                        state.cancel_token.cancel();
-                        if let Err(e) = command
-                            .create_response(
-                                &ctx.http,
-                                CreateInteractionResponse::Message(
-                                    CreateInteractionResponseMessage::new()
-                                        .content("✅ Cancelled on-going relog session")
-                                        .flags(InteractionResponseFlags::EPHEMERAL),
-                                ),
-                            )
-                            .await
-                        {
-                            internal_err(&ctx, &command, &e.to_string()).await;
-                        }
-                    }
-                }
 
-                "auto" => {
-                    if let CommandDataOptionValue::SubCommandGroup(group_options) = &top.value {
-                        if let Some(toggle) = group_options.iter().find(|o| o.name == "toggle") {
-                            if let CommandDataOptionValue::SubCommand(toggle_options) =
-                                &toggle.value
-                            {
-                                if toggle_options.is_empty() {
-                                    let mut auto_relog = guild_data.settings.auto_relog;
-                                    auto_relog = !auto_relog;
-                                    guild_data.settings.auto_relog = auto_relog;
-
-                                    if let Err(e) = command
-                                        .create_response(
-                                            &ctx.http,
-                                            CreateInteractionResponse::Message(
-                                                CreateInteractionResponseMessage::new()
-                                                    .content(format!(
-                                                        "✅ Toggled auto relog\n`{}` -> `{}`",
-                                                        !auto_relog, auto_relog
-                                                    ))
-                                                    .flags(InteractionResponseFlags::EPHEMERAL),
-                                            ),
-                                        )
-                                        .await
-                                    {
-                                        internal_err(&ctx, &command, &e.to_string()).await;
-                                    }
-
-                                    {
-                                        let mut guilds = bot_data.guilds.lock().await;
-                                        guilds.insert(guild_id_u64, guild_data.clone());
-                                    }
-                                    save_guild_data(guild_id_u64, &guild_data);
+                        "cancel" => {
+                            let state = get_relog_state(guild_id_u64).await;
+                            if state.lock.try_lock().is_ok() {
+                                if let Err(e) = command
+                                    .create_response(
+                                        &ctx.http,
+                                        CreateInteractionResponse::Message(
+                                            CreateInteractionResponseMessage::new()
+                                                .content("❌ No on-going relog session active")
+                                                .flags(InteractionResponseFlags::EPHEMERAL),
+                                        ),
+                                    )
+                                    .await
+                                {
+                                    internal_err(&ctx, &command, &e.to_string()).await;
                                 }
+                                return;
+                            } else {
+                                state.cancel_token.cancel();
+                                if let Err(e) = command
+                                    .create_response(
+                                        &ctx.http,
+                                        CreateInteractionResponse::Message(
+                                            CreateInteractionResponseMessage::new()
+                                                .content("✅ Cancelled on-going relog session")
+                                                .flags(InteractionResponseFlags::EPHEMERAL),
+                                        ),
+                                    )
+                                    .await
+                                {
+                                    internal_err(&ctx, &command, &e.to_string()).await;
+                                }
+                            }
+                        }
+
+                        "auto" => {
+                            if let CommandDataOptionValue::SubCommandGroup(group_options) =
+                                &top.value
+                            {
+                                if let Some(toggle) =
+                                    group_options.iter().find(|o| o.name == "toggle")
+                                {
+                                    if let CommandDataOptionValue::SubCommand(toggle_options) =
+                                        &toggle.value
+                                    {
+                                        if toggle_options.is_empty() {
+                                            let mut auto_relog = guild_data.settings.auto_relog;
+                                            auto_relog = !auto_relog;
+                                            guild_data.settings.auto_relog = auto_relog;
+
+                                            if let Err(e) = command
+                                                .create_response(
+                                                    &ctx.http,
+                                                    CreateInteractionResponse::Message(
+                                                        CreateInteractionResponseMessage::new()
+                                                            .content(format!(
+                                                                "✅ Toggled auto relog\n`{}` -> `{}`",
+                                                                !auto_relog, auto_relog
+                                                            ))
+                                                            .flags(InteractionResponseFlags::EPHEMERAL),
+                                                    ),
+                                                )
+                                                .await
+                                            {
+                                                internal_err(&ctx, &command, &e.to_string()).await;
+                                            }
+
+                                            let _ = save_guild_data(
+                                                &bot_data.pool,
+                                                guild_id_u64,
+                                                &guild_data,
+                                            )
+                                            .await;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        _ => {
+                            if let Err(e) = command
+                                .create_response(
+                                    &ctx.http,
+                                    CreateInteractionResponse::Message(
+                                        CreateInteractionResponseMessage::new()
+                                            .content(
+                                                "❓ Available options: `start`, `cancel`, `auto`",
+                                            )
+                                            .flags(InteractionResponseFlags::EPHEMERAL),
+                                    ),
+                                )
+                                .await
+                            {
+                                internal_err(&ctx, &command, &e.to_string()).await;
                             }
                         }
                     }
                 }
-
-                _ => {
-                    if let Err(e) = command
-                        .create_response(
-                            &ctx.http,
-                            CreateInteractionResponse::Message(
-                                CreateInteractionResponseMessage::new()
-                                    .content("❓ Available options: `start`, `cancel`, `auto`")
-                                    .flags(InteractionResponseFlags::EPHEMERAL),
-                            ),
-                        )
-                        .await
-                    {
-                        internal_err(&ctx, &command, &e.to_string()).await;
-                    }
+            }
+            Err(e) => {
+                internal_err(&ctx, &command, &e.to_string()).await;
+                if let Err(e2) = command.create_response(&ctx.http, CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❗ Failed to fetch from Database\nPlease report the problem to developer...")
+                        .flags(InteractionResponseFlags::EPHEMERAL)
+                )).await {
+                    internal_err(&ctx, &command, &e2.to_string()).await;
                 }
             }
         }
@@ -443,11 +462,7 @@ async fn relog_start(
             }
         }
 
-        {
-            let mut guilds = bot_data.guilds.lock().await;
-            guilds.insert(guild_id_u64, guild_data.clone());
-        }
-        save_guild_data(guild_id_u64, &guild_data);
+        let _ = save_guild_data(&bot_data.pool, guild_id_u64, &guild_data).await;
 
         let _ = log_channel
             .edit_message(
@@ -467,140 +482,146 @@ async fn relog_start(
     Ok(())
 }
 
-pub async fn log_daily_counts(ctx: Context, bot_data: Arc<BotData>) {
+pub async fn log_daily_counts(ctx: Context, bot_data: std::sync::Arc<BotData>) {
     let mut interval = interval(chrono::Duration::minutes(5).to_std().unwrap());
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     loop {
         interval.tick().await;
 
-        let guilds = bot_data.guilds.lock().await.clone();
-        for (guild_id_u64, mut guild_data) in guilds {
-            let state = get_relog_state(guild_id_u64).await;
-            if state.lock.try_lock().is_err() || !guild_data.settings.auto_relog {
-                continue;
-            }
+        match load_all_data(&bot_data.pool).await {
+            Ok(guilds) => {
+                for (guild_id_u64, mut guild_data) in guilds.0 {
+                    let state = get_relog_state(guild_id_u64).await;
+                    if state.lock.try_lock().is_err() || !guild_data.settings.auto_relog {
+                        continue;
+                    }
 
-            if let Some(count_ch_id) = guild_data.ids.counting_channel_id {
-                if let Some(log_ch_id) = guild_data.ids.log_channel_id {
-                    let count_channel = ChannelId::new(count_ch_id);
-                    let log_channel = ChannelId::new(log_ch_id);
+                    if let Some(count_ch_id) = guild_data.ids.counting_channel_id {
+                        if let Some(log_ch_id) = guild_data.ids.log_channel_id {
+                            let count_channel = ChannelId::new(count_ch_id);
+                            let log_channel = ChannelId::new(log_ch_id);
 
-                    match fetch_new_daily_counts(
-                        &ctx.http,
-                        count_channel,
-                        &guild_data.settings.utc,
-                        guild_data.ids.last_scanned_msg_id.map(MessageId::new),
-                    )
-                    .await
-                    {
-                        Ok((new_counts, last_seen)) => {
-                            // merge into existing counts
-                            for (date, count) in new_counts {
-                                guild_data
-                                    .daily_counts
-                                    .entry(date)
-                                    .and_modify(|v| *v = (*v).max(count))
-                                    .or_insert(count);
-                            }
-                            if let Some(new_last) = last_seen {
-                                guild_data.ids.last_scanned_msg_id = Some(new_last.get());
-                            }
-
-                            // update ONLY current year logs
-                            let offset =
-                                FixedOffset::east_opt(guild_data.settings.utc as i32 * 3600)
-                                    .unwrap();
-                            let year_now = Utc::now().with_timezone(&offset).year();
-
-                            let year_counts: BTreeMap<String, i64> = guild_data
-                                .daily_counts
-                                .iter()
-                                .filter(|(k, _)| k.starts_with(&year_now.to_string()))
-                                .map(|(k, v)| (k.clone(), *v))
-                                .collect();
-
-                            let new_log_msgs =
-                                generate_log_messages(&guild_data, year_counts, None);
-
-                            let mut year_map = guild_data
-                                .ids
-                                .log_msg_map
-                                .remove(&year_now)
-                                .unwrap_or_default();
-
-                            let mut is_new_log_msg = false;
-
-                            for (part, new_msg) in new_log_msgs.clone() {
-                                let embed = CreateEmbed::new().description(new_msg).color(0x00ffff);
-
-                                if let Some(&old_id) = year_map.get(&part) {
-                                    let _ = log_channel
-                                        .edit_message(
-                                            &ctx.http,
-                                            MessageId::new(old_id),
-                                            EditMessage::new().embed(embed.clone()),
-                                        )
-                                        .await;
-                                } else if let Ok(new_msg) = log_channel
-                                    .send_message(
-                                        &ctx.http,
-                                        CreateMessage::new().embed(embed.clone()),
-                                    )
-                                    .await
-                                {
-                                    is_new_log_msg = true;
-                                    year_map.insert(part, new_msg.id.get());
-                                }
-                            }
-
-                            if is_new_log_msg {
-                                if let Some(id) = guild_data.ids.log_helper_msg_id {
-                                    let _ =
-                                        log_channel.delete_message(&ctx.http, MessageId::new(id));
-                                }
-                                {
-                                    let lang1 = guild_data.settings.lang.as_str();
-                                    let lang2 = guild_data.settings.lang2.as_deref();
-
-                                    if let Ok(msg) = log_channel
-                                        .send_message(
-                                            &ctx.http,
-                                            CreateMessage::new().content(get_word(
-                                                "log_helper_msg-0",
-                                                lang1,
-                                                lang2,
-                                                CharaCase::Normal,
-                                            )),
-                                        )
-                                        .await
-                                    {
-                                        guild_data.ids.log_helper_msg_id = Some(msg.id.get());
-                                    }
-                                }
-                            }
-
-                            // cleanup: if year_map had leftover parts not regenerated
-                            let valid_parts: Vec<i64> = new_log_msgs.keys().cloned().collect();
-                            year_map.retain(|part, _| valid_parts.contains(part));
-
-                            guild_data.ids.log_msg_map.insert(year_now, year_map);
-
+                            match fetch_new_daily_counts(
+                                &ctx.http,
+                                count_channel,
+                                &guild_data.settings.utc,
+                                guild_data.ids.last_scanned_msg_id.map(MessageId::new),
+                            )
+                            .await
                             {
-                                let mut guilds = bot_data.guilds.lock().await;
-                                guilds.insert(guild_id_u64, guild_data.clone());
+                                Ok((new_counts, last_seen)) => {
+                                    // merge into existing counts
+                                    for (date, count) in new_counts {
+                                        guild_data
+                                            .daily_counts
+                                            .entry(date)
+                                            .and_modify(|v| *v = (*v).max(count))
+                                            .or_insert(count);
+                                    }
+                                    if let Some(new_last) = last_seen {
+                                        guild_data.ids.last_scanned_msg_id = Some(new_last.get());
+                                    }
+
+                                    // update ONLY current year logs
+                                    let offset = FixedOffset::east_opt(
+                                        guild_data.settings.utc as i32 * 3600,
+                                    )
+                                    .unwrap();
+                                    let year_now = Utc::now().with_timezone(&offset).year();
+
+                                    let year_counts: BTreeMap<String, i64> = guild_data
+                                        .daily_counts
+                                        .iter()
+                                        .filter(|(k, _)| k.starts_with(&year_now.to_string()))
+                                        .map(|(k, v)| (k.clone(), *v))
+                                        .collect();
+
+                                    let new_log_msgs =
+                                        generate_log_messages(&guild_data, year_counts, None);
+
+                                    let mut year_map = guild_data
+                                        .ids
+                                        .log_msg_map
+                                        .remove(&year_now)
+                                        .unwrap_or_default();
+
+                                    let mut is_new_log_msg = false;
+
+                                    for (part, new_msg) in new_log_msgs.clone() {
+                                        let embed =
+                                            CreateEmbed::new().description(new_msg).color(0x00ffff);
+
+                                        if let Some(&old_id) = year_map.get(&part) {
+                                            let _ = log_channel
+                                                .edit_message(
+                                                    &ctx.http,
+                                                    MessageId::new(old_id),
+                                                    EditMessage::new().embed(embed.clone()),
+                                                )
+                                                .await;
+                                        } else if let Ok(new_msg) = log_channel
+                                            .send_message(
+                                                &ctx.http,
+                                                CreateMessage::new().embed(embed.clone()),
+                                            )
+                                            .await
+                                        {
+                                            is_new_log_msg = true;
+                                            year_map.insert(part, new_msg.id.get());
+                                        }
+                                    }
+
+                                    if is_new_log_msg {
+                                        if let Some(id) = guild_data.ids.log_helper_msg_id {
+                                            let _ = log_channel
+                                                .delete_message(&ctx.http, MessageId::new(id));
+                                        }
+                                        {
+                                            let lang1 = guild_data.settings.lang.as_str();
+                                            let lang2 = guild_data.settings.lang2.as_deref();
+
+                                            if let Ok(msg) = log_channel
+                                                .send_message(
+                                                    &ctx.http,
+                                                    CreateMessage::new().content(get_word(
+                                                        "log_helper_msg-0",
+                                                        lang1,
+                                                        lang2,
+                                                        CharaCase::Normal,
+                                                    )),
+                                                )
+                                                .await
+                                            {
+                                                guild_data.ids.log_helper_msg_id =
+                                                    Some(msg.id.get());
+                                            }
+                                        }
+                                    }
+
+                                    // cleanup: if year_map had leftover parts not regenerated
+                                    let valid_parts: Vec<i64> =
+                                        new_log_msgs.keys().cloned().collect();
+                                    year_map.retain(|part, _| valid_parts.contains(part));
+
+                                    guild_data.ids.log_msg_map.insert(year_now, year_map);
+
+                                    let _ =
+                                        save_guild_data(&bot_data.pool, guild_id_u64, &guild_data)
+                                            .await;
+                                }
+                                Err(e) => {
+                                    log_error(&format!(
+                                        "Failed fetching new counts for Guild{}: {}",
+                                        guild_id_u64, e
+                                    ));
+                                }
                             }
-                            save_guild_data(guild_id_u64, &guild_data);
-                        }
-                        Err(e) => {
-                            log_error(&format!(
-                                "Failed fetching new counts for Guild{}: {}",
-                                guild_id_u64, e
-                            ));
                         }
                     }
                 }
             }
+            Err(_) => {}
         }
     }
 }

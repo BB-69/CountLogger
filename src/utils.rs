@@ -1,5 +1,6 @@
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use serenity::all::MessageFlags;
 use serenity::builder::*;
 use serenity::model::application::*;
 use serenity::prelude::*;
@@ -25,13 +26,11 @@ pub async fn internal_err(ctx: &Context, command: &CommandInteraction, err: &str
     );
 
     let _ = command
-        .create_response(
+        .create_followup(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(&msg)
-                    .flags(InteractionResponseFlags::EPHEMERAL),
-            ),
+            CreateInteractionResponseFollowup::new()
+                .content(&msg)
+                .flags(MessageFlags::EPHEMERAL),
         )
         .await;
 

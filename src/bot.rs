@@ -1,22 +1,20 @@
-use crate::data::{BotData, BotDataKey, load_all_data};
+use crate::data::{BotData, BotDataKey};
 use crate::handlers;
 use crate::utils::{log_error, log_info, log_warn};
 use chrono::Utc;
 use serenity::Client;
 use serenity::all::GatewayIntents;
+use sqlx::{Pool, Postgres};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
-pub async fn run(token: String) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(token: String, pool: Pool<Postgres>) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         log_info("🎧 Creating Discord client…");
 
-        let all_data = load_all_data();
-        let guilds_map = Arc::new(Mutex::new(all_data.0));
         let bot_start = Utc::now();
 
         let bot_data = Arc::new(BotData {
-            guilds: guilds_map,
+            pool: Arc::new(pool.clone()),
             start_time: bot_start,
         });
 
